@@ -1,0 +1,24 @@
+{
+  "required": true,
+  "package": "com.raishxn.gtna.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "refmap": "gtna.refmap.json",
+  "minVersion": "0.8",
+  "mixins": [
+    "ae2.CPUSelectionListMixin",
+    "ae2.CraftingCPUClusterMixin",
+    "ae2.CraftingServiceMixin",
+    "ae2.ElapsedTimeTrackerMixin",
+    "ae2.PatternProviderLogicMixin",
+    "ae2.TooltipsMixin",
+    "gtceu.GTNAPlateDoubleMixin",
+    "gtceu.PredicatesMixin",
+    "gtceu.GTRecipeLogicMixin",
+    "gtceu.RecipeHelperMixin"
+  ],
+  "client": [
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
