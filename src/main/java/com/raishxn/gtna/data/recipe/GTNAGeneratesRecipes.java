@@ -305,7 +305,7 @@ public class GTNAGeneratesRecipes {
                     .inputItems(quintupleIngot, material, 6400)
                     .outputItems(singularity, material)
                     .duration(400)
-                    .EUt(GTValues.VA[GTValues.MAX])
+                    .EUt(GTValues.VA[GTValues.ZPM])
                     .save(provider);
         }
     }

@@ -52,13 +52,13 @@ public class GTNAHatchesRecipes {
                     .pattern("CDC")
                     .pattern("EFE")
                     .define('A', CustomTags.UV_CIRCUITS)
-                    .define('B', GTItems.ROBOT_ARM_UV.asStack().getItem())
-                    .define('C', GTItems.CONVEYOR_MODULE_UV.asStack().getItem())
-                    .define('D', GTItems.FIELD_GENERATOR_UV.asStack().getItem())
+                    .define('B', GTItems.ROBOT_ARM_ZPM.asStack().getItem())
+                    .define('C', GTItems.CONVEYOR_MODULE_ZPM.asStack().getItem())
+                    .define('D', GTItems.FIELD_GENERATOR_ZPM.asStack().getItem())
                     .define('E',
                             ChemicalHelper.get(TagPrefix.cableGtQuadruple,
                                     GTMaterials.EnrichedNaquadahTriniumEuropiumDuranide).getItem())
-                    .define('F', GTMachines.HULL[UV].asStack().getItem())
+                    .define('F', GTMachines.HULL[ZPM].asStack().getItem())
                     .unlockedBy("has_hull_uv",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTMachines.HULL[UV].asStack().getItem()))
                     .save(provider);
@@ -70,7 +70,7 @@ public class GTNAHatchesRecipes {
         createAccelerateRecipe(provider, IV, GTItems.SENSOR_IV, GTItems.FIELD_GENERATOR_IV);
         createAccelerateRecipe(provider, LuV, GTItems.SENSOR_LuV, GTItems.FIELD_GENERATOR_LuV);
         createAccelerateRecipe(provider, ZPM, GTItems.SENSOR_ZPM, GTItems.FIELD_GENERATOR_ZPM);
-        createAccelerateRecipe(provider, UV, GTItems.SENSOR_UV, GTItems.FIELD_GENERATOR_UV);
+        createAccelerateRecipe(provider, UV, GTItems.SENSOR_ZPM, GTItems.FIELD_GENERATOR_ZPM);
         createOutputBoostRecipe(provider, LV, GTItems.EMITTER_LV, GTItems.SENSOR_LV);
         createOutputBoostRecipe(provider, MV, GTItems.EMITTER_MV, GTItems.SENSOR_MV);
         createOutputBoostRecipe(provider, HV, GTItems.EMITTER_HV, GTItems.SENSOR_HV);
@@ -78,15 +78,15 @@ public class GTNAHatchesRecipes {
         createOutputBoostRecipe(provider, IV, GTItems.EMITTER_IV, GTItems.SENSOR_IV);
         createOutputBoostRecipe(provider, LuV, GTItems.EMITTER_LuV, GTItems.SENSOR_LuV);
         createOutputBoostRecipe(provider, ZPM, GTItems.EMITTER_ZPM, GTItems.SENSOR_ZPM);
-        createOutputBoostRecipe(provider, UV, GTItems.EMITTER_UV, GTItems.SENSOR_UV);
+        createOutputBoostRecipe(provider, UV, GTItems.EMITTER_ZPM, GTItems.SENSOR_ZPM);
         for (int tier = LV; tier <= OpV; tier++) {
-            createInfiniteInputBusRecipe(provider, tier, getEmitter(tier), getSensor(tier));
-            createInfiniteInputHatchRecipe(provider, tier, getEmitter(tier), getFieldGenerator(tier));
-            createOutputBoostItemBusRecipe(provider, tier, getEmitter(tier), getSensor(tier));
-            createOutputBoostFluidHatchRecipe(provider, tier, getEmitter(tier), getFieldGenerator(tier));
+            createInfiniteInputBusRecipe(provider, tier, getEmitter(clamp(tier)), getSensor(clamp(tier)));
+            createInfiniteInputHatchRecipe(provider, tier, getEmitter(clamp(tier)), getFieldGenerator(clamp(tier)));
+            createOutputBoostItemBusRecipe(provider, tier, getEmitter(clamp(tier)), getSensor(clamp(tier)));
+            createOutputBoostFluidHatchRecipe(provider, tier, getEmitter(clamp(tier)), getFieldGenerator(clamp(tier)));
         }
 
-        createOverclockRecipe(provider, UV, GTItems.FIELD_GENERATOR_UV, GTItems.VOLTAGE_COIL_UV);
+        createOverclockRecipe(provider, UV, GTItems.FIELD_GENERATOR_ZPM, GTItems.VOLTAGE_COIL_ZPM);
         createCraftingCPUInterfaceRecipe(provider);
         createMEStorageAccessRecipes(provider);
     }
@@ -158,7 +158,7 @@ public class GTNAHatchesRecipes {
     private static void createAccelerateRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike sensor,
                                                ItemLike middleItem) {
         if (GTNAMachines2.ACCELERATE_HATCHES[tier] == null) return;
-        ItemLike hull = GTMachines.HULL[tier].asStack().getItem();
+        ItemLike hull = GTMachines.HULL[clamp(tier)].asStack().getItem();
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines2.ACCELERATE_HATCHES[tier].asStack().getItem())
                 .pattern("ABA")
                 .pattern("BCB")
@@ -173,7 +173,7 @@ public class GTNAHatchesRecipes {
     private static void createOverclockRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike fieldGen,
                                               ItemLike coil) {
         if (GTNAMachines2.OVERCLOCK_HATCHES[tier] == null) return;
-        ItemLike hull = GTMachines.HULL[tier].asStack().getItem();
+        ItemLike hull = GTMachines.HULL[clamp(tier)].asStack().getItem();
         ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines2.OVERCLOCK_HATCHES[tier].asStack().getItem())
                 .pattern("ABA")
                 .pattern("BCB")
@@ -188,7 +188,7 @@ public class GTNAHatchesRecipes {
     private static void createOutputBoostRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike emitter,
                                                 ItemLike sensor) {
         if (GTNAMachines2.OUTPUT_BOOST_HATCHES[tier] == null) return;
-        ItemLike hull = GTMachines.HULL[tier].asStack().getItem();
+        ItemLike hull = GTMachines.HULL[clamp(tier)].asStack().getItem();
         GTNARecipeVisibility.saveRestricted(provider, id("output_boost_hatch_", tier),
                 restrictedProvider -> ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                         GTNAMachines2.OUTPUT_BOOST_HATCHES[tier].asStack().getItem())
@@ -205,7 +205,7 @@ public class GTNAHatchesRecipes {
     private static void createInfiniteInputBusRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike emitter,
                                                      ItemLike sensor) {
         if (GTNAMachines2.INFINITE_INPUT_BUSES[tier] == null) return;
-        ItemLike baseBus = GTMachines.ITEM_IMPORT_BUS[tier].asStack().getItem();
+        ItemLike baseBus = GTMachines.ITEM_IMPORT_BUS[clamp(tier)].asStack().getItem();
         GTNARecipeVisibility.saveRestricted(provider, id("infinite_input_bus_", tier),
                 restrictedProvider -> ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                         GTNAMachines2.INFINITE_INPUT_BUSES[tier].asStack().getItem())
@@ -222,7 +222,7 @@ public class GTNAHatchesRecipes {
     private static void createInfiniteInputHatchRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike emitter,
                                                        ItemLike fieldGenerator) {
         if (GTNAMachines2.INFINITE_INPUT_HATCHES[tier] == null) return;
-        ItemLike baseHatch = GTMachines.FLUID_IMPORT_HATCH[tier].asStack().getItem();
+        ItemLike baseHatch = GTMachines.FLUID_IMPORT_HATCH[clamp(tier)].asStack().getItem();
         GTNARecipeVisibility.saveRestricted(provider, id("infinite_input_hatch_", tier),
                 restrictedProvider -> ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                         GTNAMachines2.INFINITE_INPUT_HATCHES[tier].asStack().getItem())
@@ -239,7 +239,7 @@ public class GTNAHatchesRecipes {
     private static void createOutputBoostItemBusRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike emitter,
                                                        ItemLike sensor) {
         if (GTNAMachines2.OUTPUT_BOOST_ITEM_BUSES[tier] == null) return;
-        ItemLike baseBus = GTMachines.ITEM_EXPORT_BUS[tier].asStack().getItem();
+        ItemLike baseBus = GTMachines.ITEM_EXPORT_BUS[clamp(tier)].asStack().getItem();
         GTNARecipeVisibility.saveRestricted(provider, id("output_boost_item_bus_", tier),
                 restrictedProvider -> ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                         GTNAMachines2.OUTPUT_BOOST_ITEM_BUSES[tier].asStack().getItem())
@@ -256,7 +256,7 @@ public class GTNAHatchesRecipes {
     private static void createOutputBoostFluidHatchRecipe(Consumer<FinishedRecipe> provider, int tier, ItemLike emitter,
                                                           ItemLike fieldGenerator) {
         if (GTNAMachines2.OUTPUT_BOOST_FLUID_HATCHES[tier] == null) return;
-        ItemLike baseHatch = GTMachines.FLUID_EXPORT_HATCH[tier].asStack().getItem();
+        ItemLike baseHatch = GTMachines.FLUID_EXPORT_HATCH[clamp(tier)].asStack().getItem();
         GTNARecipeVisibility.saveRestricted(provider, id("output_boost_fluid_hatch_", tier),
                 restrictedProvider -> ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                         GTNAMachines2.OUTPUT_BOOST_FLUID_HATCHES[tier].asStack().getItem())
@@ -272,6 +272,11 @@ public class GTNAHatchesRecipes {
 
     private static ResourceLocation id(String prefix, int tier) {
         return GTNACORE.id(prefix + VN[tier].toLowerCase());
+    }
+
+    /** 把 ≥UV(8) 的输入电压等级封顶到 ZPM(7)，低于 ZPM 的原样保留。 */
+    private static int clamp(int tier) {
+        return Math.min(tier, ZPM);
     }
 
     private static ItemLike getEmitter(int tier) {

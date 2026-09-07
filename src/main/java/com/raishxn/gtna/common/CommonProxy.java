@@ -73,9 +73,12 @@ public class CommonProxy {
     }
 
     private void clientSetup(final FMLClientSetupEvent event) {
-        event.enqueueWork(() -> {
-            registerDynamicRenderers();
-        });
+        // Register the DynamicRenderTypes synchronously during mod setup.
+        // Must NOT be deferred via enqueueWork(), otherwise it runs after the
+        // Resource reload has started and the machine block models referencing
+        // these dynamic render types fail to bake -> the machine casing renders
+        // as invisible while the dynamic spheres still draw.
+        registerDynamicRenderers();
     }
 
     private void registerAdditionalModels(ModelEvent.RegisterAdditional event) {
