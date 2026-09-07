@@ -20,9 +20,9 @@ import static com.raishxn.gtna.common.data.GTNARecipeType.COSMOS_SIMULATION_RECI
 /**
  * 「千行星碰撞维度」配方生成器。
  * 在 datagen 阶段枚举所有已注册的 GTM 材料：
- *  - 产出每种带有 gemExquisite（精致宝石）的精致宝石，1200 个/种。
- *  - 产出前三条恒星配方（stellar_atmosphere / stellar_metallogenesis /
- *    stellar_superheavy_synthesis）尚未使用的矿粉，1200 个/种。
+ * - 产出每种带有 gemExquisite（精致宝石）的精致宝石，1200 个/种。
+ * - 产出前三条恒星配方（stellar_atmosphere / stellar_metallogenesis /
+ *   stellar_superheavy_synthesis）尚未使用的矿粉，1200 个/种。
  * 一个配方最多 120 个物品输出槽，若超出则自动拆分到后续配方。
  * 输入宽松（后期新手友好、耗时约 2 分钟之内）：不同档位反物质燃料棒 + UUMatter。
  */
