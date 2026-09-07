@@ -1326,10 +1326,10 @@ public class GTNAMachineRecipes {
             GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("artificial_star")
                     .inputItems(GTNABlocks.GRAVITON_FIELD_CONSTRAINT_CASING.asItem(), 4)
                     .inputItems(GTNABlocks.ANNIHILATE_CORE.asItem())
-                    .inputItems(GTItems.EMITTER_UXV, 4)
-                    .inputItems(GTItems.SENSOR_UXV, 4)
+                    .inputItems(GTItems.EMITTER_ZPM, 4)
+                    .inputItems(GTItems.SENSOR_ZPM, 4)
                     .inputItems(CustomTags.OpV_CIRCUITS, 4)
-                    .inputItems(GTItems.FIELD_GENERATOR_UXV, 16)
+                    .inputItems(GTItems.FIELD_GENERATOR_ZPM, 16)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium).getItem(), 8)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.NaquadahAlloy).getItem(), 8)
                     .inputFluids(GTMaterials.SolderingAlloy.getFluid(4000))
@@ -1337,10 +1337,10 @@ public class GTNAMachineRecipes {
                     .inputFluids(GTMaterials.Naquadria.getFluid(4000))
                     .outputItems(GTNAMachines.ARTIFICIAL_STAR.asStack())
                     .duration(1800)
-                    .EUt(125829120)
+                    .EUt(131072)
                     .stationResearch(b -> b.researchStack(GTNABlocks.ANNIHILATE_CORE.asStack())
                             .CWUt(4096)
-                            .EUt(125829120))
+                            .EUt(131072))
                     .save(provider);
         }
 
@@ -1350,12 +1350,12 @@ public class GTNAMachineRecipes {
                     .inputItems(GTNABlocks.SPACETIME_COMPRESSION_FIELD_GENERATOR.asItem(), 16)
                     .inputItems(GTNABlocks.DIMENSIONAL_STABILITY_CASING.asItem(), 16)
                     .inputItems(GTNAMachines.ARTIFICIAL_STAR.asStack().getItem(), 4)
-                    .inputItems(GTItems.FIELD_GENERATOR_OpV, 16)
-                    .inputItems(GTItems.EMITTER_OpV, 16)
-                    .inputItems(GTItems.SENSOR_OpV, 16)
-                    .inputItems(GTItems.ROBOT_ARM_OpV, 16)
-                    .inputItems(GTItems.ELECTRIC_PUMP_OpV, 8)
-                    .inputItems(GTItems.ELECTRIC_MOTOR_OpV, 8)
+                    .inputItems(GTItems.FIELD_GENERATOR_ZPM, 16)
+                    .inputItems(GTItems.EMITTER_ZPM, 16)
+                    .inputItems(GTItems.SENSOR_ZPM, 16)
+                    .inputItems(GTItems.ROBOT_ARM_ZPM, 16)
+                    .inputItems(GTItems.ELECTRIC_PUMP_ZPM, 8)
+                    .inputItems(GTItems.ELECTRIC_MOTOR_ZPM, 8)
                     .inputItems(GTItems.GRAVI_STAR, 8)
                     .inputItems(CustomTags.OpV_CIRCUITS, 16)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium).getItem(), 32)
@@ -1365,10 +1365,10 @@ public class GTNAMachineRecipes {
                     .inputFluids(GTMaterials.Naquadria.getFluid(16000))
                     .outputItems(GTNAMachines.EYE_OF_HARMONY.asStack())
                     .duration(2400)
-                    .EUt(8053063680L)
+                    .EUt(131072)
                     .stationResearch(b -> b.researchStack(GTNABlocks.SPACETIME_COMPRESSION_FIELD_GENERATOR.asStack())
                             .CWUt(16384)
-                            .EUt(8053063680L))
+                            .EUt(131072))
                     .save(provider);
         }
 
@@ -1649,13 +1649,13 @@ public class GTNAMachineRecipes {
         GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("nexus_capacitor_uv")
                 .inputItems(GTNABlocks.NEXUS_CAPACITOR_ZPM.asStack().getItem(), 2)
                 .inputItems(CustomTags.UV_CIRCUITS, 4)
-                .inputItems(GTItems.FIELD_GENERATOR_UV.asStack().getItem(), 2)
+                .inputItems(GTItems.FIELD_GENERATOR_ZPM.asStack().getItem(), 2)
                 .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Darmstadtium).getItem(), 8)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(4608))
                 .outputItems(GTNABlocks.NEXUS_CAPACITOR_UV.asStack())
-                .duration(600).EUt(GTValues.VA[GTValues.UV])
+                .duration(600).EUt(GTValues.VA[GTValues.ZPM])
                 .stationResearch(b -> b.researchStack(GTNABlocks.NEXUS_CAPACITOR_ZPM.asStack()).CWUt(256)
-                        .EUt(GTValues.VA[GTValues.UV]))
+                        .EUt(GTValues.VA[GTValues.ZPM]))
                 .save(provider);
 
         GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("nexus_capacitor_uhv")
@@ -1664,9 +1664,9 @@ public class GTNAMachineRecipes {
                 .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium).getItem(), 8)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(9216))
                 .outputItems(GTNABlocks.NEXUS_CAPACITOR_UHV.asStack())
-                .duration(600).EUt(GTValues.VA[GTValues.UHV])
+                .duration(600).EUt(GTValues.VA[GTValues.ZPM])
                 .stationResearch(b -> b.researchStack(GTNABlocks.NEXUS_CAPACITOR_UV.asStack()).CWUt(512)
-                        .EUt(GTValues.VA[GTValues.UHV]))
+                        .EUt(GTValues.VA[GTValues.ZPM]))
                 .save(provider);
 
         // --- Wireless Hatches Recipes ---
@@ -1686,16 +1686,16 @@ public class GTNAMachineRecipes {
         };
 
         for (int tier = GTValues.LV; tier <= GTValues.UHV; tier++) {
+            int in = Math.min(tier, GTValues.ZPM); // 输入电压等级封顶到 ZPM；输出仍按原 tier
             String tierName = GTValues.VN[tier].toLowerCase(java.util.Locale.ROOT);
-            int euCost = (int) GTValues.VA[tier];
-            net.minecraft.world.level.ItemLike sensor = (tier < sensors.length) ? sensors[tier] :
-                    sensors[sensors.length - 1];
+            int euCost = (int) GTValues.VA[in];
+            net.minecraft.world.level.ItemLike sensor = sensors[in];
 
             // === 1A Hatches (LV-UHV) — ampExp = 0 ===
-            if (tier < GTMachines.ENERGY_INPUT_HATCH.length && GTMachines.ENERGY_INPUT_HATCH[tier] != null &&
+            if (tier < GTMachines.ENERGY_INPUT_HATCH.length && GTMachines.ENERGY_INPUT_HATCH[in] != null &&
                     GTNAEnergyHatches.WIRELESS_ENERGY_HATCHES[tier][0] != null) {
                 GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_in_1a_" + tierName)
-                        .inputItems(GTMachines.ENERGY_INPUT_HATCH[tier].asStack(), 2)
+                        .inputItems(GTMachines.ENERGY_INPUT_HATCH[in].asStack(), 2)
                         .inputItems(sensor, 2)
                         .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 2)
                         .inputFluids(GTMaterials.SolderingAlloy.getFluid(144))
@@ -1703,10 +1703,10 @@ public class GTNAMachineRecipes {
                         .duration(200).EUt(euCost)
                         .save(provider);
             }
-            if (tier < GTMachines.ENERGY_OUTPUT_HATCH.length && GTMachines.ENERGY_OUTPUT_HATCH[tier] != null &&
+            if (tier < GTMachines.ENERGY_OUTPUT_HATCH.length && GTMachines.ENERGY_OUTPUT_HATCH[in] != null &&
                     GTNAEnergyHatches.WIRELESS_DYNAMO_HATCHES[tier][0] != null) {
                 GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_out_1a_" + tierName)
-                        .inputItems(GTMachines.ENERGY_OUTPUT_HATCH[tier].asStack(), 2)
+                        .inputItems(GTMachines.ENERGY_OUTPUT_HATCH[in].asStack(), 2)
                         .inputItems(sensor, 2)
                         .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 2)
                         .inputFluids(GTMaterials.SolderingAlloy.getFluid(144))
@@ -1717,10 +1717,10 @@ public class GTNAMachineRecipes {
 
             // === 4A Hatches (EV+) — ampExp = 1 ===
             if (tier < GTMachines.ENERGY_INPUT_HATCH_4A.length &&
-                    GTMachines.ENERGY_INPUT_HATCH_4A[tier] != null &&
+                    GTMachines.ENERGY_INPUT_HATCH_4A[in] != null &&
                     GTNAEnergyHatches.WIRELESS_ENERGY_HATCHES[tier][1] != null) {
                 GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_in_4a_" + tierName)
-                        .inputItems(GTMachines.ENERGY_INPUT_HATCH_4A[tier].asStack(), 2)
+                        .inputItems(GTMachines.ENERGY_INPUT_HATCH_4A[in].asStack(), 2)
                         .inputItems(sensor, 4)
                         .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 2)
                         .inputFluids(GTMaterials.SolderingAlloy.getFluid(288))
@@ -1729,10 +1729,10 @@ public class GTNAMachineRecipes {
                         .save(provider);
             }
             if (tier < GTMachines.ENERGY_OUTPUT_HATCH_4A.length &&
-                    GTMachines.ENERGY_OUTPUT_HATCH_4A[tier] != null &&
+                    GTMachines.ENERGY_OUTPUT_HATCH_4A[in] != null &&
                     GTNAEnergyHatches.WIRELESS_DYNAMO_HATCHES[tier][1] != null) {
                 GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_out_4a_" + tierName)
-                        .inputItems(GTMachines.ENERGY_OUTPUT_HATCH_4A[tier].asStack(), 2)
+                        .inputItems(GTMachines.ENERGY_OUTPUT_HATCH_4A[in].asStack(), 2)
                         .inputItems(sensor, 4)
                         .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 2)
                         .inputFluids(GTMaterials.SolderingAlloy.getFluid(288))
@@ -1743,10 +1743,10 @@ public class GTNAMachineRecipes {
 
             // === 16A Hatches (EV+) — ampExp = 2 ===
             if (tier < GTMachines.ENERGY_INPUT_HATCH_16A.length &&
-                    GTMachines.ENERGY_INPUT_HATCH_16A[tier] != null &&
+                    GTMachines.ENERGY_INPUT_HATCH_16A[in] != null &&
                     GTNAEnergyHatches.WIRELESS_ENERGY_HATCHES[tier][2] != null) {
                 GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_in_16a_" + tierName)
-                        .inputItems(GTMachines.ENERGY_INPUT_HATCH_16A[tier].asStack(), 2)
+                        .inputItems(GTMachines.ENERGY_INPUT_HATCH_16A[in].asStack(), 2)
                         .inputItems(sensor, 4)
                         .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                         .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
@@ -1755,10 +1755,10 @@ public class GTNAMachineRecipes {
                         .save(provider);
             }
             if (tier < GTMachines.ENERGY_OUTPUT_HATCH_16A.length &&
-                    GTMachines.ENERGY_OUTPUT_HATCH_16A[tier] != null &&
+                    GTMachines.ENERGY_OUTPUT_HATCH_16A[in] != null &&
                     GTNAEnergyHatches.WIRELESS_DYNAMO_HATCHES[tier][2] != null) {
                 GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_out_16a_" + tierName)
-                        .inputItems(GTMachines.ENERGY_OUTPUT_HATCH_16A[tier].asStack(), 2)
+                        .inputItems(GTMachines.ENERGY_OUTPUT_HATCH_16A[in].asStack(), 2)
                         .inputItems(sensor, 4)
                         .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                         .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
@@ -1770,10 +1770,10 @@ public class GTNAMachineRecipes {
             // === Laser Hatches 256A/1024A/4096A (IV+) — ampExp = 3,4,5 ===
             if (true) {
                 // 256A — ampExp = 3
-                if (tier < GTMachines.LASER_INPUT_HATCH_256.length && GTMachines.LASER_INPUT_HATCH_256[tier] != null &&
+                if (tier < GTMachines.LASER_INPUT_HATCH_256.length && GTMachines.LASER_INPUT_HATCH_256[in] != null &&
                         GTNAEnergyHatches.WIRELESS_ENERGY_HATCHES[tier][3] != null) {
                     GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_in_256a_" + tierName)
-                            .inputItems(GTMachines.LASER_INPUT_HATCH_256[tier].asStack(), 1)
+                            .inputItems(GTMachines.LASER_INPUT_HATCH_256[in].asStack(), 1)
                             .inputItems(sensor, 4)
                             .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                             .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
@@ -1782,10 +1782,10 @@ public class GTNAMachineRecipes {
                             .save(provider);
                 }
                 if (tier < GTMachines.LASER_OUTPUT_HATCH_256.length &&
-                        GTMachines.LASER_OUTPUT_HATCH_256[tier] != null &&
+                        GTMachines.LASER_OUTPUT_HATCH_256[in] != null &&
                         GTNAEnergyHatches.WIRELESS_DYNAMO_HATCHES[tier][3] != null) {
                     GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_out_256a_" + tierName)
-                            .inputItems(GTMachines.LASER_OUTPUT_HATCH_256[tier].asStack(), 1)
+                            .inputItems(GTMachines.LASER_OUTPUT_HATCH_256[in].asStack(), 1)
                             .inputItems(sensor, 4)
                             .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                             .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
@@ -1796,10 +1796,10 @@ public class GTNAMachineRecipes {
 
                 // 1024A — ampExp = 4
                 if (tier < GTMachines.LASER_INPUT_HATCH_1024.length &&
-                        GTMachines.LASER_INPUT_HATCH_1024[tier] != null &&
+                        GTMachines.LASER_INPUT_HATCH_1024[in] != null &&
                         GTNAEnergyHatches.WIRELESS_ENERGY_HATCHES[tier][4] != null) {
                     GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_in_1024a_" + tierName)
-                            .inputItems(GTMachines.LASER_INPUT_HATCH_1024[tier].asStack(), 1)
+                            .inputItems(GTMachines.LASER_INPUT_HATCH_1024[in].asStack(), 1)
                             .inputItems(sensor, 8)
                             .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                             .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
@@ -1808,10 +1808,10 @@ public class GTNAMachineRecipes {
                             .save(provider);
                 }
                 if (tier < GTMachines.LASER_OUTPUT_HATCH_1024.length &&
-                        GTMachines.LASER_OUTPUT_HATCH_1024[tier] != null &&
+                        GTMachines.LASER_OUTPUT_HATCH_1024[in] != null &&
                         GTNAEnergyHatches.WIRELESS_DYNAMO_HATCHES[tier][4] != null) {
                     GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_out_1024a_" + tierName)
-                            .inputItems(GTMachines.LASER_OUTPUT_HATCH_1024[tier].asStack(), 1)
+                            .inputItems(GTMachines.LASER_OUTPUT_HATCH_1024[in].asStack(), 1)
                             .inputItems(sensor, 8)
                             .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                             .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
@@ -1822,10 +1822,10 @@ public class GTNAMachineRecipes {
 
                 // 4096A — ampExp = 5
                 if (tier < GTMachines.LASER_INPUT_HATCH_4096.length &&
-                        GTMachines.LASER_INPUT_HATCH_4096[tier] != null &&
+                        GTMachines.LASER_INPUT_HATCH_4096[in] != null &&
                         GTNAEnergyHatches.WIRELESS_ENERGY_HATCHES[tier][5] != null) {
                     GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_in_4096a_" + tierName)
-                            .inputItems(GTMachines.LASER_INPUT_HATCH_4096[tier].asStack(), 1)
+                            .inputItems(GTMachines.LASER_INPUT_HATCH_4096[in].asStack(), 1)
                             .inputItems(sensor, 16)
                             .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                             .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
@@ -1834,10 +1834,10 @@ public class GTNAMachineRecipes {
                             .save(provider);
                 }
                 if (tier < GTMachines.LASER_OUTPUT_HATCH_4096.length &&
-                        GTMachines.LASER_OUTPUT_HATCH_4096[tier] != null &&
+                        GTMachines.LASER_OUTPUT_HATCH_4096[in] != null &&
                         GTNAEnergyHatches.WIRELESS_DYNAMO_HATCHES[tier][5] != null) {
                     GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("wireless_energy_out_4096a_" + tierName)
-                            .inputItems(GTMachines.LASER_OUTPUT_HATCH_4096[tier].asStack(), 1)
+                            .inputItems(GTMachines.LASER_OUTPUT_HATCH_4096[in].asStack(), 1)
                             .inputItems(sensor, 16)
                             .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.EnderPearl).getItem(), 4)
                             .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
@@ -2027,7 +2027,7 @@ public class GTNAMachineRecipes {
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNABlocks.T5_ME_STORAGE_CORE.asItem())
                 .duration(200)
-                .EUt(491520)
+                .EUt(GTValues.VA[GTValues.ZPM])
                 .save(provider);
 
         // GTOCore AssemblerA.t*_crafting_storage_core.
@@ -2074,7 +2074,7 @@ public class GTNAMachineRecipes {
                 .inputItems(AEItems.ADVANCED_CARD.asItem(), 4)
                 .outputItems(GTNABlocks.T5_CRAFTING_STORAGE_CORE.asItem())
                 .duration(200)
-                .EUt(491520)
+                .EUt(GTValues.VA[GTValues.ZPM])
                 .save(provider);
 
         // --- GTLsupb ports (LGPLv3) ---

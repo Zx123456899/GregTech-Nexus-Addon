@@ -352,15 +352,15 @@ public class GTNAItemRecipes {
         GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("gtna_infinite_cell_component")
                 .inputItems(AEItems.CELL_COMPONENT_256K.asItem(), 64)
                 .inputItems(AEBlocks.CREATIVE_ENERGY_CELL.block().asItem(), 16)
-                .inputItems(GTItems.FIELD_GENERATOR_UV.asStack().getItem(), 8)
-                .inputItems(GTItems.EMITTER_UV.asStack().getItem(), 8)
-                .inputItems(GTItems.SENSOR_UV.asStack().getItem(), 8)
+                .inputItems(GTItems.FIELD_GENERATOR_ZPM.asStack().getItem(), 8)
+                .inputItems(GTItems.EMITTER_ZPM.asStack().getItem(), 8)
+                .inputItems(GTItems.SENSOR_ZPM.asStack().getItem(), 8)
                 .inputItems(CustomTags.UV_CIRCUITS, 16)
                 .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium), 4)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(9216))
                 .outputItems(GTNAItems.INFINITE_CELL_COMPONENT.get())
                 .duration(2400)
-                .EUt(GTValues.VA[GTValues.UV])
+                .EUt(GTValues.VA[GTValues.ZPM])
                 .save(provider);
 
         if (GTNAMachines2.ME_MINI_PATTERN_BUFFER != null) {
@@ -421,12 +421,12 @@ public class GTNAItemRecipes {
                     .inputItems(AEItems.SPEED_CARD.asItem(), 8)
                     .inputItems(AEItems.CAPACITY_CARD.asItem(), 8)
                     .inputItems(CustomTags.UV_CIRCUITS, 4)
-                    .inputItems(GTItems.ROBOT_ARM_UV.get())
-                    .inputItems(GTItems.SENSOR_UV.get())
+                    .inputItems(GTItems.ROBOT_ARM_ZPM.get())
+                    .inputItems(GTItems.SENSOR_ZPM.get())
                     .inputFluids(GTMaterials.SolderingAlloy.getFluid(2304))
                     .outputItems(GTNAMachines2.ME_ULTIMATE_PATTERN_BUFFER.asStack())
                     .duration(1000)
-                    .EUt(GTValues.VA[GTValues.UV])
+                    .EUt(GTValues.VA[GTValues.ZPM])
                     .save(provider);
         }
 
@@ -470,10 +470,10 @@ public class GTNAItemRecipes {
                 .save(provider);
 
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("pattern_buffer_upgrade_72")
-                .inputItems(GTItems.SENSOR_UV.get())
-                .inputItems(GTItems.ROBOT_ARM_UV.get())
-                .inputItems(GTItems.CONVEYOR_MODULE_UV.get())
-                .inputItems(GTItems.ELECTRIC_PUMP_UV.get())
+                .inputItems(GTItems.SENSOR_ZPM.get())
+                .inputItems(GTItems.ROBOT_ARM_ZPM.get())
+                .inputItems(GTItems.CONVEYOR_MODULE_ZPM.get())
+                .inputItems(GTItems.ELECTRIC_PUMP_ZPM.get())
                 .inputItems(GTItems.COVER_WIRELESS_TRANSMITTER.get(), 2)
                 .inputItems(GTItems.TOOL_DATA_ORB.get())
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
@@ -486,14 +486,14 @@ public class GTNAItemRecipes {
 
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_annihilation_constrainer")
                 .inputItems(GTItems.GRAVI_STAR.get())
-                .inputItems(GTItems.FIELD_GENERATOR_UHV.get(), 2)
-                .inputItems(GTItems.EMITTER_UHV.get(), 2)
-                .inputItems(GTItems.SENSOR_UHV.get(), 2)
+                .inputItems(GTItems.FIELD_GENERATOR_ZPM.get(), 2)
+                .inputItems(GTItems.EMITTER_ZPM.get(), 2)
+                .inputItems(GTItems.SENSOR_ZPM.get(), 2)
                 .inputItems(TagPrefix.plateDouble, GTMaterials.Neutronium, 4)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNAItems.ANNIHILATION_CONSTRAINER.get())
                 .duration(400)
-                .EUt(1966080)
+                .EUt(131072)
                 .save(provider);
 
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_neutronium_antimatter_fuel_rod")
@@ -504,49 +504,49 @@ public class GTNAItemRecipes {
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(288))
                 .outputItems(GTNAItems.NEUTRONIUM_ANTIMATTER_FUEL_ROD.get())
                 .duration(300)
-                .EUt(491520)
+                .EUt(131072)
                 .save(provider);
 
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_draconium_antimatter_fuel_rod")
                 .inputItems(GTNAItems.NEUTRONIUM_ANTIMATTER_FUEL_ROD.get())
-                .inputItems(GTItems.FIELD_GENERATOR_UHV.get(), 2)
+                .inputItems(GTItems.FIELD_GENERATOR_ZPM.get(), 2)
                 .inputItems(TagPrefix.plateDouble, GTMaterials.Naquadria, 4)
                 .inputItems(CustomTags.UEV_CIRCUITS, 2)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(288))
                 .outputItems(GTNAItems.DRACONIUM_ANTIMATTER_FUEL_ROD.get())
                 .duration(400)
-                .EUt(1966080)
+                .EUt(131072)
                 .save(provider);
 
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_cosmic_neutronium_antimatter_fuel_rod")
                 .inputItems(GTNAItems.DRACONIUM_ANTIMATTER_FUEL_ROD.get())
-                .inputItems(GTItems.FIELD_GENERATOR_UEV.get(), 2)
+                .inputItems(GTItems.FIELD_GENERATOR_ZPM.get(), 2)
                 .inputItems(GTItems.GRAVI_STAR.get(), 2)
                 .inputItems(TagPrefix.plateDouble, GTMaterials.Neutronium, 8)
                 .inputItems(CustomTags.UIV_CIRCUITS, 2)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNAItems.COSMIC_NEUTRONIUM_ANTIMATTER_FUEL_ROD.get())
                 .duration(500)
-                .EUt(7864320)
+                .EUt(131072)
                 .save(provider);
 
         GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("gtna_infinity_antimatter_fuel_rod")
                 .inputItems(GTNAItems.COSMIC_NEUTRONIUM_ANTIMATTER_FUEL_ROD.get())
                 .inputItems(GTNAItems.ANNIHILATION_CONSTRAINER.get(), 2)
-                .inputItems(GTItems.FIELD_GENERATOR_UIV.get(), 2)
-                .inputItems(GTItems.EMITTER_UIV.get(), 2)
-                .inputItems(GTItems.SENSOR_UIV.get(), 2)
+                .inputItems(GTItems.FIELD_GENERATOR_ZPM.get(), 2)
+                .inputItems(GTItems.EMITTER_ZPM.get(), 2)
+                .inputItems(GTItems.SENSOR_ZPM.get(), 2)
                 .inputItems(TagPrefix.plateDouble, GTMaterials.Neutronium, 8)
                 .inputItems(CustomTags.UXV_CIRCUITS, 2)
                 .inputFluids(GTMaterials.Europium.getFluid(1152))
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
                 .outputItems(GTNAItems.INFINITY_ANTIMATTER_FUEL_ROD.get())
                 .duration(600)
-                .EUt(31457280)
+                .EUt(131072)
                 .stationResearch(b -> b
                         .researchStack(GTNAItems.COSMIC_NEUTRONIUM_ANTIMATTER_FUEL_ROD.asStack())
                         .CWUt(256)
-                        .EUt(7864320))
+                        .EUt(131072))
                 .save(provider);
 
         GTNARecipeVisibility.saveRestricted(provider, GTNACORE.id("infinite_steam_singleblock_cover"),
@@ -623,30 +623,30 @@ public class GTNAItemRecipes {
         }
         if (GTNAMachines2.THREAD_HATCHES[GTValues.UV] != null) {
             GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_thread_hatch_uv")
-                    .inputItems(GTMachines.HULL[GTValues.UV].asStack())
-                    .inputItems(GTItems.ROBOT_ARM_UV.get())
-                    .inputItems(GTItems.CONVEYOR_MODULE_UV.get())
-                    .inputItems(GTItems.EMITTER_UV.get())
+                    .inputItems(GTMachines.HULL[GTValues.ZPM].asStack())
+                    .inputItems(GTItems.ROBOT_ARM_ZPM.get())
+                    .inputItems(GTItems.CONVEYOR_MODULE_ZPM.get())
+                    .inputItems(GTItems.EMITTER_ZPM.get())
                     .inputItems(CustomTags.UHV_CIRCUITS, 2)
                     .inputItems(TagPrefix.wireGtQuadruple, GTMaterials.NaquadahAlloy, 4)
                     .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
                     .outputItems(GTNAMachines2.THREAD_HATCHES[GTValues.UV].asStack())
                     .duration(500)
-                    .EUt(GTValues.VA[GTValues.UV])
+                    .EUt(GTValues.VA[GTValues.ZPM])
                     .save(provider);
         }
         if (GTNAMachines2.THREAD_HATCHES[GTValues.UHV] != null) {
             GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_thread_hatch_uhv")
-                    .inputItems(GTMachines.HULL[GTValues.UHV].asStack())
-                    .inputItems(GTItems.ROBOT_ARM_UHV.get())
-                    .inputItems(GTItems.CONVEYOR_MODULE_UHV.get())
-                    .inputItems(GTItems.EMITTER_UHV.get())
+                    .inputItems(GTMachines.HULL[GTValues.ZPM].asStack())
+                    .inputItems(GTItems.ROBOT_ARM_ZPM.get())
+                    .inputItems(GTItems.CONVEYOR_MODULE_ZPM.get())
+                    .inputItems(GTItems.EMITTER_ZPM.get())
                     .inputItems(CustomTags.UEV_CIRCUITS, 2)
                     .inputItems(TagPrefix.wireGtQuadruple, GTMaterials.RutheniumTriniumAmericiumNeutronate, 4)
                     .inputFluids(GTMaterials.SolderingAlloy.getFluid(2304))
                     .outputItems(GTNAMachines2.THREAD_HATCHES[GTValues.UHV].asStack())
                     .duration(600)
-                    .EUt(GTValues.VA[GTValues.UHV])
+                    .EUt(GTValues.VA[GTValues.ZPM])
                     .save(provider);
         }
     }

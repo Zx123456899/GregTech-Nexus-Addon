@@ -76,6 +76,7 @@ public class GTNAGTAddon implements IGTAddon {
         GTNAInfernalCokeRecipes.register(provider);
         GTNAHighPressureRecipes.register(provider);
         GTNALavaMakerRecipes.register(provider);
+        GTNAPlanetaryCollisionRecipes.register(provider);
         VoidminerRecipes.register(provider);
     }
 
