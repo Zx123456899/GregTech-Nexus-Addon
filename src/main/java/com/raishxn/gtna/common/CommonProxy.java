@@ -6,6 +6,7 @@ import com.gregtechceu.gtceu.api.data.chemical.material.event.MaterialRegistryEv
 import com.gregtechceu.gtceu.api.data.chemical.material.event.PostMaterialEvent;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
+import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderManager;
 import com.gregtechceu.gtceu.api.recipe.condition.RecipeConditionType;
 
 import net.minecraft.core.HolderLookup;
@@ -93,9 +94,19 @@ public class CommonProxy {
     }
 
     private static void registerDynamicRenderers() {
-        var ignoredAnnihilate = AnnihilateGeneratorRenderer.TYPE;
-        var ignoredEyeOfHarmony = EyeOfHarmonyRenderer.TYPE;
-        var ignoredEyeOfWood = EyeOfWoodRenderer.TYPE;
+        // Register each dynamic render type explicitly (and idempotently). Keeping the
+        // registration here — instead of inside the renderer's static field initializer —
+        // makes the timing deterministic, so the machine models can find their dynamic
+        // render types when they bake during resource reload.
+        if (DynamicRenderManager.getType(GTNACORE.id("annihilate_generator/star")) == null) {
+            DynamicRenderManager.register(GTNACORE.id("annihilate_generator/star"), AnnihilateGeneratorRenderer.TYPE);
+        }
+        if (DynamicRenderManager.getType(GTNACORE.id("eye_of_harmony/render")) == null) {
+            DynamicRenderManager.register(GTNACORE.id("eye_of_harmony/render"), EyeOfHarmonyRenderer.TYPE);
+        }
+        if (DynamicRenderManager.getType(GTNACORE.id("eye_of_wood/render")) == null) {
+            DynamicRenderManager.register(GTNACORE.id("eye_of_wood/render"), EyeOfWoodRenderer.TYPE);
+        }
     }
 
     // You MUST have this for custom materials.

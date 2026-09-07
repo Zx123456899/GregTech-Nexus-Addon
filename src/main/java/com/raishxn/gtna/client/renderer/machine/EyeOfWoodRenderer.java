@@ -1,7 +1,6 @@
 package com.raishxn.gtna.client.renderer.machine;
 
 import com.gregtechceu.gtceu.client.renderer.machine.DynamicRender;
-import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderManager;
 import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderType;
 
 import net.minecraft.client.Camera;
@@ -26,8 +25,8 @@ import org.joml.Quaternionf;
 public class EyeOfWoodRenderer extends DynamicRender<EyeOfWoodMachine, EyeOfWoodRenderer> {
 
     public static final Codec<EyeOfWoodRenderer> CODEC = Codec.unit(EyeOfWoodRenderer::new);
-    public static final DynamicRenderType<EyeOfWoodMachine, EyeOfWoodRenderer> TYPE = DynamicRenderManager
-            .register(GTNACORE.id("eye_of_wood/render"), new DynamicRenderType<>(CODEC));
+    public static final DynamicRenderType<EyeOfWoodMachine, EyeOfWoodRenderer> TYPE =
+            new DynamicRenderType<>(CODEC);
 
     private static final ResourceLocation THINKING_MODEL = GTNACORE.id("obj/eye_of_wood_thinking");
     private static final ResourceLocation SWEAT_MODEL = GTNACORE.id("obj/eye_of_wood_sweat");
