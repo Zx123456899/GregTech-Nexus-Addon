@@ -18,6 +18,7 @@ import net.minecraft.network.chat.Component;
 
 import com.raishxn.gtna.api.machine.IThreadModifierMachine;
 import com.raishxn.gtna.api.machine.feature.IPatternBufferModeHost;
+import com.raishxn.gtna.api.machine.multiblock.IGTNAModulePerformanceHost;
 import com.raishxn.gtna.api.machine.multiblock.ParallelMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.AccelerateHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostHatchPartMachine;
@@ -132,13 +133,26 @@ public class WorkableElectricMultipleRecipesMachine extends WorkableElectricMult
     }
 
     // Métodos usados pelo GTNAMultipleRecipesLogic para calcular a velocidade final
-    public double getDurationMultiplier() {
+    /**
+     * @param recipeTier the recipe's pre-overclock voltage tier (GTOCore semantics: the accelerate
+     *                   penalty follows the recipe, not the machine tier)
+     */
+    public double getDurationMultiplier(int recipeTier) {
         double multiplier = 1.0;
         for (AccelerateHatchPartMachine hatch : accelerateHatches) {
-            double percentage = hatch.calcDurationPercentage(this.getTier()) / 100.0;
+            double percentage = hatch.calcDurationPercentage(recipeTier) / 100.0;
             multiplier *= percentage;
         }
-        return Math.max(0.01, multiplier);
+        return Math.max(0.01, multiplier / ((IGTNAModulePerformanceHost) this).gtna$getModuleSpeedBonus());
+    }
+
+    /** Best-case multiplier for the UI (no recipe tier penalty). */
+    public double getNominalDurationMultiplier() {
+        double multiplier = 1.0;
+        for (AccelerateHatchPartMachine hatch : accelerateHatches) {
+            multiplier *= hatch.getMinDurationPercentage() / 100.0;
+        }
+        return Math.max(0.01, multiplier / ((IGTNAModulePerformanceHost) this).gtna$getModuleSpeedBonus());
     }
 
     public double getOverclockHatchMultiplier() {
@@ -159,7 +173,8 @@ public class WorkableElectricMultipleRecipesMachine extends WorkableElectricMult
 
     public OverclockingLogic getOverclockingLogic() {
         if (!hasOverclockHatch()) {
-            return OverclockingLogic.NON_PERFECT_OVERCLOCK;
+            return ((IGTNAModulePerformanceHost) this).gtna$hasModulePerfectOverclock() ?
+                    OverclockingLogic.PERFECT_OVERCLOCK : OverclockingLogic.NON_PERFECT_OVERCLOCK;
         }
         return OverclockingLogic.create(getOverclockDurationFactor(), OverclockingLogic.STD_VOLTAGE_FACTOR, false);
     }
@@ -176,6 +191,13 @@ public class WorkableElectricMultipleRecipesMachine extends WorkableElectricMult
     public void addDisplayText(List<Component> textList) {
         MultiblockDisplayText.builder(textList, isFormed())
                 .setWorkingStatus(recipeLogic.isWorkingEnabled(), recipeLogic.isActive())
+                .addEnergyUsageLine(energyContainer)
+                .addEnergyTierLine(getTier())
+                .addMachineModeLine(getRecipeType(), getRecipeTypes().length > 1)
+                .addWorkingStatusLine()
+                .addProgressLine(recipeLogic)
+                .addRecipeFailReasonLine(recipeLogic)
+                .addOutputLines(recipeLogic.getLastRecipe())
                 .addCustom(text -> {
                     GTNAMultipleRecipesLogic logic = getRecipeLogic();
                     long storedEnergy = 0;
@@ -185,51 +207,89 @@ public class WorkableElectricMultipleRecipesMachine extends WorkableElectricMult
                         storedEnergy = getEnergyContainer().getEnergyStored();
                     }
                     int tier = getTier();
-                    String tierName = GTValues.VN[tier];
-                    text.add(Component.literal("Max EU/t: ").withStyle(ChatFormatting.GRAY)
-                            .append(Component.literal(String.format(Locale.US, "%,d", storedEnergy))
-                                    .withStyle(ChatFormatting.WHITE))
-                            .append(Component.literal(" (" + tierName + ")").withStyle(ChatFormatting.GOLD)));
+                    // Electric multiblocks derive their tier from the energy container voltage, which can exceed
+                    // MAX when an over-tier energy hatch is installed; never index VN out of bounds.
+                    String tierName = tier >= 0 && tier < GTValues.VN.length ? GTValues.VN[tier] : ("T" + tier);
+                    text.add(Component.translatable("gtna.multiblock.max_eut",
+                            Component.literal(String.format(Locale.US, "%,d", storedEnergy))
+                                    .withStyle(ChatFormatting.WHITE),
+                            Component.literal(tierName).withStyle(ChatFormatting.GOLD))
+                            .withStyle(ChatFormatting.GRAY));
 
                     int parallel = getMaxParallel();
-                    if (parallel > 1) {
-                        text.add(Component.literal("Parallels: ").withStyle(ChatFormatting.GRAY)
-                                .append(Component.literal(String.valueOf(parallel)).withStyle(ChatFormatting.GREEN)));
+                    boolean gtoProcessMachine = this instanceof IndustrialFlotationCellMachine ||
+                            this instanceof VacuumDryingFurnaceMachine;
+                    if (parallel > 1 && !gtoProcessMachine) {
+                        text.add(Component.translatable("gtna.multiblock.parallels",
+                                Component.literal(String.valueOf(parallel)).withStyle(ChatFormatting.GREEN))
+                                .withStyle(ChatFormatting.GRAY));
                     }
 
                     // Informações de UI dos Hatches
                     if (hasOverclockHatch()) {
                         double ocMultiplier = getOverclockDurationFactor();
-                        text.add(Component.literal("Overclock Hatch: ").withStyle(ChatFormatting.GRAY)
-                                .append(Component.literal(String.format(Locale.US, "%.2fx duration per 4x EU",
-                                        ocMultiplier))
-                                        .withStyle(ChatFormatting.LIGHT_PURPLE)));
+                        text.add(Component.translatable("gtna.multiblock.overclock_hatch",
+                                Component.translatable("gtna.multiblock.overclock_hatch.value", ocMultiplier)
+                                        .withStyle(ChatFormatting.LIGHT_PURPLE))
+                                .withStyle(ChatFormatting.GRAY));
                     }
 
-                    double accMultiplier = getDurationMultiplier();
+                    double accMultiplier = getNominalDurationMultiplier();
                     if (accMultiplier < 1.0) {
-                        text.add(Component.literal("Accelerate Hatch: ").withStyle(ChatFormatting.GRAY)
-                                .append(Component.literal(String.format("%.2fx Duration", accMultiplier))
-                                        .withStyle(ChatFormatting.LIGHT_PURPLE)));
+                        text.add(Component.translatable("gtna.multiblock.accelerate_hatch",
+                                Component.translatable("gtna.multiblock.accelerate_hatch.value", accMultiplier)
+                                        .withStyle(ChatFormatting.LIGHT_PURPLE))
+                                .withStyle(ChatFormatting.GRAY));
                     }
 
                     int outputMultiplier = getOutputBoostMultiplier();
                     if (outputMultiplier > 1) {
-                        text.add(Component.literal("Output Boost Hatch: ").withStyle(ChatFormatting.GRAY)
-                                .append(Component.literal(String.format("%dx Outputs", outputMultiplier))
-                                        .withStyle(ChatFormatting.AQUA)));
+                        text.add(Component.translatable("gtna.multiblock.output_boost_hatch",
+                                Component.translatable("gtna.multiblock.output_boost_hatch.value", outputMultiplier)
+                                        .withStyle(ChatFormatting.AQUA))
+                                .withStyle(ChatFormatting.GRAY));
                     }
 
-                    text.add(Component.literal("Active Threads: ").withStyle(ChatFormatting.GRAY)
-                            .append(Component.literal(logic.getActiveRecipeCount() + " / " + logic.getMaxThreads())
-                                    .withStyle(ChatFormatting.AQUA)));
+                    // The thread panel only belongs to machines that actually run multiple threads
+                    // (Thread Hatch installed). Without it the machine is a normal single-recipe
+                    // multiblock and the standard MultiblockDisplayText progress above is enough.
+                    if (logic.getMaxThreads() > 1) {
+                        text.add(Component.translatable("gtna.multiblock.active_threads",
+                                Component.literal(logic.getActiveRecipeCount() + " / " + logic.getMaxThreads())
+                                        .withStyle(ChatFormatting.AQUA))
+                                .withStyle(ChatFormatting.GRAY));
 
-                    text.add(Component.empty());
-                    List<Component> activeThreadsInfo = logic.getRecipeDisplayInfo();
-                    if (!activeThreadsInfo.isEmpty()) text.addAll(activeThreadsInfo);
-                    else text
-                            .add(Component.literal("Idle - Waiting for inputs...").withStyle(ChatFormatting.DARK_GRAY));
+                        text.add(Component.empty());
+                        List<Component> activeThreadsInfo = logic.getRecipeDisplayInfo();
+                        if (!activeThreadsInfo.isEmpty()) text.addAll(activeThreadsInfo);
+                        else text.add(Component.translatable("gtna.multiblock.idle")
+                                .withStyle(ChatFormatting.DARK_GRAY));
+                    }
                 });
+        if (isFormed() && (this instanceof IndustrialFlotationCellMachine ||
+                this instanceof VacuumDryingFurnaceMachine)) {
+            int index = Math.min(2, textList.size());
+            int parallel = getMaxParallel();
+            if (parallel > 1) {
+                textList.add(index++, Component.translatable("gtna.ui.parallel_max",
+                        Component.literal(Integer.toString(parallel)).withStyle(ChatFormatting.LIGHT_PURPLE))
+                        .withStyle(ChatFormatting.GRAY));
+            }
+            textList.add(index++, Component.translatable("gtna.ui.voiding_mode",
+                    Component.translatable(getVoidingMode().getSerializedName()).withStyle(ChatFormatting.GRAY))
+                    .withStyle(ChatFormatting.WHITE));
+            if (this instanceof VacuumDryingFurnaceMachine furnace) {
+                textList.add(index++, Component.translatable("gtna.ui.heat_capacity",
+                        Component.literal(com.gregtechceu.gtceu.utils.FormattingUtil
+                                .formatNumbers(furnace.getHeatingCoilTemperature()) + "K")
+                                .withStyle(ChatFormatting.RED))
+                        .withStyle(ChatFormatting.WHITE));
+            }
+            if (getRecipeLogic().isIdle() && getRecipeLogic().getLastRecipe() == null) {
+                textList.add(index, Component.translatable("gtna.ui.no_recipe_found")
+                        .withStyle(ChatFormatting.GRAY));
+            }
+        }
     }
 
     @Override
@@ -255,10 +315,15 @@ public class WorkableElectricMultipleRecipesMachine extends WorkableElectricMult
         if (modeId == null || modeId.isBlank()) {
             return false;
         }
+        // Exact GTM formula (MachineModeFancyConfigurator.setActiveRecipeTypeAndUpdateTickSubs):
+        // only re-subscribe tick handlers when the mode actually changed and the machine
+        // does not keep its subscriptions alive permanently.
         for (int i = 0; i < getRecipeTypes().length; i++) {
             if (gtna$matchesModeId(modeId, getRecipeTypes()[i])) {
-                if (getActiveRecipeType() != i) {
-                    setActiveRecipeType(i);
+                boolean needUpdateTickSubs = !keepSubscribing() && getActiveRecipeType() != i;
+                setActiveRecipeType(i); // @Persisted: NBT + network sync are automatic
+                if (needUpdateTickSubs) {
+                    getRecipeLogic().updateTickSubscription();
                 }
                 return true;
             }

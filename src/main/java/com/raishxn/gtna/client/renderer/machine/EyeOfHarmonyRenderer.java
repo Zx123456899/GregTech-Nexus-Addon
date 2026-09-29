@@ -1,6 +1,7 @@
 package com.raishxn.gtna.client.renderer.machine;
 
 import com.gregtechceu.gtceu.client.renderer.machine.DynamicRender;
+import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderManager;
 import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderType;
 
 import net.minecraft.client.Minecraft;
@@ -26,8 +27,8 @@ import java.util.List;
 public class EyeOfHarmonyRenderer extends DynamicRender<EyeOfHarmonyMachine, EyeOfHarmonyRenderer> {
 
     public static final Codec<EyeOfHarmonyRenderer> CODEC = Codec.unit(EyeOfHarmonyRenderer::new);
-    public static final DynamicRenderType<EyeOfHarmonyMachine, EyeOfHarmonyRenderer> TYPE =
-            new DynamicRenderType<>(CODEC);
+    public static final DynamicRenderType<EyeOfHarmonyMachine, EyeOfHarmonyRenderer> TYPE = DynamicRenderManager
+            .register(GTNACORE.id("eye_of_harmony/render"), new DynamicRenderType<>(CODEC));
 
     private static final ResourceLocation SPACE_MODEL = GTNACORE.id("obj/space");
     private static final ResourceLocation STAR_MODEL = GTNACORE.id("obj/star");

@@ -15,13 +15,18 @@ import com.gregtechceu.gtceu.common.data.GTMaterials;
 import com.gregtechceu.gtceu.config.ConfigHolder;
 import com.gregtechceu.gtceu.data.recipe.builder.GTRecipeBuilder;
 
+import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
+
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.material.Fluids;
 import net.minecraftforge.fluids.FluidStack;
 
+import com.raishxn.gtna.api.machine.multiblock.GTNAPartAbility;
+import com.raishxn.gtna.client.renderer.GTNATextures;
 import com.raishxn.gtna.common.data.GTNABlocks;
 import org.jetbrains.annotations.NotNull;
 
@@ -35,13 +40,19 @@ public class LargeSteamSolarBoilerMachine extends WorkableMultiblockMachine impl
     private static final int MAX_SIDE = 63;
     private static final int MAX_BACK = 125;
     private static final int TICK_INTERVAL = 20;
-    private static final int STEAM_PER_CELL = 200;
 
     private int lDist;
     private int rDist;
     private int bDist;
     private int sunlit;
-    private long lastSteamOutput;
+    /**
+     * Steam produced per <b>second</b> (mB/s). The recipe makes {@code sunlit * STEAM_PER_CELL} mB
+     * every {@link #TICK_INTERVAL} ticks, so the per-second rate is that batch scaled by 20/tick
+     * interval — for the current 20-tick cycle it is exactly the batch amount. The old code
+     * multiplied by 20 (a 20x over-report) and every reader, including Jade, disagreed with the
+     * actual recipe output.
+     */
+    private long steamPerSecond;
     private boolean formed;
 
     public LargeSteamSolarBoilerMachine(IMachineBlockEntity holder) {
@@ -110,7 +121,8 @@ public class LargeSteamSolarBoilerMachine extends WorkableMultiblockMachine impl
                 .where('~', Predicates.controller(Predicates.blocks(getDefinition().get())))
                 .where('A', Predicates.blocks(GTBlocks.STEEL_HULL.get())
                         .or(Predicates.abilities(IMPORT_FLUIDS).setPreviewCount(1))
-                        .or(Predicates.abilities(EXPORT_FLUIDS).setPreviewCount(1)))
+                        .or(Predicates.abilities(EXPORT_FLUIDS).setPreviewCount(1))
+                        .or(Predicates.abilities(GTNAPartAbility.STEAM_EXPORT_FLUIDS).setPreviewCount(1)))
                 .where('B', Predicates.blocks(GTNABlocks.SOLAR_BOILING_CELL.get()))
                 .build();
     }
@@ -129,13 +141,13 @@ public class LargeSteamSolarBoilerMachine extends WorkableMultiblockMachine impl
         }
         if (!isDaytime()) {
             sunlit = 0;
-            lastSteamOutput = 0;
+            steamPerSecond = 0;
             return;
         }
 
         sunlit = calculateSunlitArea();
         if (sunlit <= 0) {
-            lastSteamOutput = 0;
+            steamPerSecond = 0;
             return;
         }
 
@@ -177,14 +189,47 @@ public class LargeSteamSolarBoilerMachine extends WorkableMultiblockMachine impl
     }
 
     private GTRecipe createSolarRecipe() {
-        int steamOut = sunlit * STEAM_PER_CELL;
+        int steamOut = sunlit * steamPerCell();
         int waterIn = (int) Math.ceil((double) steamOut / ConfigHolder.INSTANCE.machines.largeBoilers.steamPerWater);
-        lastSteamOutput = (long) steamOut * 20L;
+        // steamOut is produced over TICK_INTERVAL ticks; scale to a per-second rate (20 ticks/s).
+        steamPerSecond = (long) steamOut * 20L / TICK_INTERVAL;
         return GTRecipeBuilder.of(GTCEu.id("large_steam_solar_boiler"), getRecipeType())
                 .inputFluids(new FluidStack(Fluids.WATER, waterIn))
                 .outputFluids(GTMaterials.Steam.getFluid(steamOut))
                 .duration(TICK_INTERVAL)
                 .buildRawRecipe();
+    }
+
+    /**
+     * mB of steam produced per sunlit cell per cycle, from the GTNA config. The original hardcoded
+     * value was 200; the default is now 4,000 (20x) because a 41x42 field only made ~312,000 mB/s,
+     * far too little for the structure's cost.
+     */
+    private static int steamPerCell() {
+        return com.raishxn.gtna.config.ConfigHolder.INSTANCE.machines.solarBoilerSteamPerCell;
+    }
+
+    /** Sunlit solar boiling cells counted at the last cycle; 0 at night or in the rain. */
+    public int getSunlitCells() {
+        return sunlit;
+    }
+
+    /** Steam produced per second (mB/s), matching the recipe's actual output. */
+    public long getSteamPerSecond() {
+        return steamPerSecond;
+    }
+
+    /** Steam the recipe dumps in one cycle (mB per {@link #TICK_INTERVAL} ticks). */
+    public long getSteamPerCycle() {
+        return (long) sunlit * steamPerCell();
+    }
+
+    @Override
+    public ModularUI createUI(Player entityPlayer) {
+        ModularUI ui = IDisplayUIMachine.super.createUI(entityPlayer);
+        // The addon logo in the bottom-right corner of the machine screen (GTNL convention).
+        ui.widget(GTNATextures.logo(151, 107));
+        return ui;
     }
 
     @Override
@@ -194,7 +239,7 @@ public class LargeSteamSolarBoilerMachine extends WorkableMultiblockMachine impl
             textList.add(Component.translatable("gtna.machine.large_steam_solar_boiler.size", (lDist + rDist + 3),
                     (bDist + 2)));
             textList.add(Component.translatable("gtna.machine.large_steam_solar_boiler.sunlit", sunlit));
-            textList.add(Component.translatable("gtna.machine.large_steam_solar_boiler.production", lastSteamOutput));
+            textList.add(Component.translatable("gtna.machine.large_steam_solar_boiler.production", steamPerSecond));
         }
     }
 }

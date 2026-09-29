@@ -1,5 +1,133 @@
 # Changelog
 
+## [0.5.1] - 2026-09-25
+
+### Corrected JAR
+- Fixed production startup crashes in the GTCEu module-tooltip and AE2 crafting-confirmation
+  mixins. Both now recognize the Minecraft 1.20.1 runtime method names, and missing injection
+  targets cannot stop the game from loading.
+- Reduced repeated structure checks while the Nexus Terminal builds the Nexus ME Hypercore.
+  The target structure is checked once at the end of the build. The in-world build time still
+  needs confirmation with the corrected JAR.
+- Re-tested startup in a Prism Launcher instance with GTCEu 7.5.3, AE2 15.4.10 and KubeJS
+  `2001.6.5-build.26`. The full validation gate passed with 60/60 GameTests.
+
+### Added
+- Ported four GTOCore multiblocks: Generator Array, Fishing Ground, Evaporation Plant and
+  Greenhouse, with their structures, recipes, casings and English/Portuguese tooltips. The
+  Evaporation Plant also has its titanium auxiliary tower.
+- Generator Array supports its eligible GTCEu generators and can send power to the Nexus Flux
+  Matrix in wireless mode. Fishing Ground includes its bait, water and circuit based catches.
+- Added automated formation, recipe, tooltip and behavior checks for the new machines.
+
+### Changed
+- Removed Nexus Flux Matrix Safe Mode. Valid energy withdrawals can drain the network to zero;
+  old SafeMode save data is ignored and no longer written.
+- Wireless Steam Hatches now declare steam specific abilities only. They no longer fill general
+  fluid hatch slots in electric multiblocks.
+- Clarified Evaporation Plant hatch placement: one fluid input and one or two energy inputs go in
+  the base; fluid outputs go in the tower stages. Fluid hatch tier is unrestricted.
+
+### Fixed
+- Prevented a startup crash with KubeJS `2001.6.5-build.26` caused by the GTNA DataGenerator
+  mixin targeting a missing method name. The injection is now optional and handles the runtime
+  method name used by Minecraft 1.20.1.
+- Greenhouse sunlight detection now responds to an opaque roof cover and recovers when it is
+  removed.
+- Revised the four ported machines' tooltips to remove duplicate descriptions and preserve
+  source attribution and relevant mechanics in both supported languages.
+
+### Validation
+- Passed the full formatting, compilation, unit test, GameTest server and data generation gate.
+  The GameTest suite passed all 60 required tests, including a MAX fluid output hatch in a valid
+  Evaporation Plant tower stage.
+
+## [0.5.0] - 2026-09-25
+
+This release expands steam and ore processing, adds multiblock modules and strengthens AE2
+autocrafting. It also includes the Structure Terminal improvements, ME Pattern Buffer fixes,
+tooltips and automated tests recorded in the continuity ledger.
+
+### Added
+- **Electric Blast Furnace module**: a GTNA sub-pattern registered for `gtceu:electric_blast_furnace`
+  that adds Parallel / Overclock / Accelerate / Thread hatches to the furnace.
+- **KubeJS support for sub-patterns**: the `GTNAServerEvents.subPatterns` server event lets modpack
+  creators add module/extension structures to any multiblock (new or existing), unlocking new
+  abilities (see `docs/roadmap/sub-patterns.md`).
+- **Sub-pattern (module/extension) mechanic** (`ISubPatternMachine` + a `MultiblockControllerMachine`
+  mixin): a multiblock can be extended by additional structures attached to the same controller, whose
+  parts are merged in to unlock new abilities (e.g. Parallel / Accelerate hatches). Ported in the
+  spirit of GTOCore's `addSubPattern`.
+- **Liquefaction Furnace** (GTOCore port, LGPLv3): a coil multiblock that melts an item into a fluid,
+  with a stainless-steel extension tower as its sub-pattern.
+- **Thermal Power Pump** (GTOCore port, LGPLv3): a primitive no-energy multiblock that condenses
+  steam into water at a biome-dependent rate (rain +50%; the Nether produces nothing).
+- **Brick Kiln** (GTOCore port, LGPLv3): a primitive no-energy multiblock that fires bricks and
+  ceramics from compressed clay + coal (parallel 4), closing the ULV era.
+- **Integrated Ore Processor** (GTLCore port, LGPLv3): the 6×12×11 stainless/HSSE multiblock that
+  collapses the macerate → wash → thermal/sift/centrifuge chain into one recipe per circuit.
+- **Advanced Integrated Ore Processor** (GTLCore/TST port, LGPLv3): the 32×12×15 laser-powered,
+  effectively unlimited-parallel endgame version.
+- **Faithful integrated ore processing recipes**: one recipe per circuit 1..7 for both raw ore and
+  stone ore, with the real per-stage byproducts, the material's own washing fluid (distilled water,
+  mercury, sodium persulfate, ...) and GTLCore's durations/EUt. The multiplier is configurable
+  (`gtna/balance/machines.json` → `integratedOreMultiplier`, default 4 = GTLCore parity).
+- **Craft recipes** for the two new multiblocks: Assembler (EV) for the Integrated Ore Processor and
+  Assembly Line (UHV) for the Advanced Integrated Ore Processor.
+
+### Changed
+- `gtna:ore_processing` now uses GTLCore's IO sizes (2 item in / 9 item out / 1 fluid in).
+- **Steam Ore Processing Module**: no longer consumes lubricant; it consumes the washing fluid of the
+  matching integrated recipe (circuit 1 needs none; 2/3/4 distilled water; 5/6/7 the ore's fluid).
+  Its input filter now only accepts ore/crushed prefixes, not ingots.
+
+### Fixed
+- **Steam Ore Processing Module** returned the raw ore unchanged: the recipe lookup passed
+  `Ingredient.of(stack)` to GT's recipe DB, which does not expand the item's tags, so tag-based ore
+  recipes were never found. It now passes the `ItemStack` (like GT's own `SmartItemFilter`).
+- **Addon logo** now shows in every GTNA multiblock UI: a client-only mixin on GTCEu's
+  `FancyMachineUIWidget` covers the electric/no-energy/fancy-steam controllers, and the two custom
+  310×270 UIs (Nexus ME Hypercore, Nexus Flux Matrix) got an explicit logo.
+
+## [0.4.0] - 2026-09-21
+
+### Added
+- **Universal Factory** (GTNA-native port of GTLsupb, LGPLv3): 32 recipe types, cross-recipe
+  threads, warmup/overload/batch processing, and the new `universal_factory_casing`.
+- **Primitive Stone Furnace** (GTLsupb port): zero-energy multiblock that smelts with effectively
+  unlimited threads and parallel.
+- **Thread Hatch** wiring: the Industrial Slaughterhouse and the Dimensionally Transcendent Dirt
+  Forge are now on the multiple-recipes base and accept the Thread Hatch.
+- **Source attribution in tooltips**: ported machines now show `Source: <addon>` (GTO, GTNL, TST,
+  GTLsupb, GTOEPP), and `THIRD_PARTY_NOTICES.md` documents the license of every source.
+
+### Changed
+- **Accelerate Hatch**: penalty now uses the recipe's pre-overclock tier (GTO parity — a low-tier
+  recipe in a high-tier machine is not punished), the amount is player-configurable, and the
+  tooltips follow the GTO wording.
+- **Overclock Hatch**: parity with GTOCore (`100 / (tier - 6) %`, configurable).
+- **Industrial Slaughterhouse** migrated to `WorkableElectricMultipleRecipesMachine`.
+- **Dimensionally Transcendent Dirt Forge** migrated to the multiple-recipes base as a zero-energy
+  machine (`getMaxParallel()` = 524288, 1-tick duration).
+- **Large Steam Solar Boiler** is the single solar boiler; the duplicate Mega Pressure Solar Boiler
+  (class, config, balance, lang, docs and recipes) was removed and the Hyper Pressure Reactor recipe
+  now uses the large one.
+- Configurable amounts for the Accelerate/Overclock/Thread hatches, with GTO-style tooltips.
+
+### Fixed
+- **Output Boost** double application (M→M²) on the multiple-recipes base.
+- **Pattern buffer** crashes: tier-index guard in `WorkableElectricMultipleRecipesMachine`
+  display text, NPE guard in `PatternSlotResolver`, and scaled-input push in
+  `ParallelPatternDetails`.
+- **Dedicated server** crash: two client-only leaks in common code.
+- **Jade** config translation crash for the pattern buffer provider.
+- Nine config options that rendered as raw lang keys.
+- Zero-energy parallel computation bypassing GT's `ParallelLogic.getMaxByInput`.
+
+### QA
+- GameTest harness plus structure/behaviour tests (16 gametests) and 12 unit tests, all gated in CI.
+- `runData` determinism check in CI.
+
 ## [0.3.2-dev] - 2026-04-25
 
 ### Added

@@ -85,7 +85,6 @@ public class ConfigHolder {
         if (INSTANCE == null) return true;
         return switch (machineId) {
             case "largeSteamCrusher" -> INSTANCE.machineToggles.largeSteamCrusher;
-            case "megaPressureSolarBoiler" -> INSTANCE.machineToggles.megaPressureSolarBoiler;
             case "largeSteamFurnace" -> INSTANCE.machineToggles.largeSteamFurnace;
             case "largeSteamAlloySmelter" -> INSTANCE.machineToggles.largeSteamAlloySmelter;
             case "largeSteamHammer" -> INSTANCE.machineToggles.largeSteamHammer;
@@ -95,6 +94,19 @@ public class ConfigHolder {
             case "primitiveDistillationTower" -> INSTANCE.machineToggles.primitiveDistillationTower;
             case "largeSteamLathe" -> INSTANCE.machineToggles.largeSteamLathe;
             case "largeSteamCutting" -> INSTANCE.machineToggles.largeSteamCutting;
+            case "largeSteamBending" -> INSTANCE.machineToggles.largeSteamBending;
+            case "largeSteamExtruder" -> INSTANCE.machineToggles.largeSteamExtruder;
+            case "largeSteamWiremill" -> INSTANCE.machineToggles.largeSteamWiremill;
+            case "largeSteamSifter" -> INSTANCE.machineToggles.largeSteamSifter;
+            case "steamLavaMaker" -> INSTANCE.machineToggles.steamLavaMaker;
+            case "steamItemVault" -> INSTANCE.machineToggles.steamItemVault;
+            case "steamCactusWonder" -> INSTANCE.machineToggles.steamCactusWonder;
+            case "steamCracking" -> INSTANCE.machineToggles.steamCracking;
+            case "megaSteamCompressor" -> INSTANCE.machineToggles.megaSteamCompressor;
+            case "steamElevator" -> INSTANCE.machineToggles.steamElevator;
+            case "steamElevatorModules" -> INSTANCE.machineToggles.steamElevatorModules;
+            case "steamApiaryModule" -> INSTANCE.machineToggles.steamApiaryModule;
+            case "steamBeeBreedingModule" -> INSTANCE.machineToggles.steamBeeBreedingModule;
             case "largeSteamFormingPress" -> INSTANCE.machineToggles.largeSteamFormingPress;
             case "steamCobbler" -> INSTANCE.machineToggles.steamCobbler;
             case "stoneSuperheater" -> INSTANCE.machineToggles.stoneSuperheater;
@@ -112,6 +124,11 @@ public class ConfigHolder {
             case "nexusMolecularForge" -> INSTANCE.machineToggles.nexusMolecularForge;
             case "nexusMeHypercore" -> INSTANCE.machineToggles.nexusMeHypercore;
             case "meStorage" -> INSTANCE.machineToggles.meStorage;
+            case "integratedOreProcessor" -> INSTANCE.machineToggles.integratedOreProcessor;
+            case "advancedIntegratedOreProcessor" -> INSTANCE.machineToggles.advancedIntegratedOreProcessor;
+            case "brickKiln" -> INSTANCE.machineToggles.brickKiln;
+            case "thermalPowerPump" -> INSTANCE.machineToggles.thermalPowerPump;
+            case "liquefactionFurnace" -> INSTANCE.machineToggles.liquefactionFurnace;
             case "durationTester" -> INSTANCE.machineToggles.durationTester;
             default -> true;
         };
@@ -142,6 +159,7 @@ public class ConfigHolder {
             case "meAdvancedPatternBuffer" -> INSTANCE.hatchToggles.meAdvancedPatternBuffer;
             case "meUltimatePatternBuffer" -> INSTANCE.hatchToggles.meUltimatePatternBuffer;
             case "meCraftPatternHatch" -> INSTANCE.hatchToggles.meCraftPatternHatch;
+            case "mePatternBufferProxy" -> INSTANCE.hatchToggles.mePatternBufferProxy;
             case "meStorageAccessHatch" -> INSTANCE.hatchToggles.meStorageAccessHatch;
             case "meBigStorageAccessHatch" -> INSTANCE.hatchToggles.meBigStorageAccessHatch;
             case "meIOPortHatch" -> INSTANCE.hatchToggles.meIOPortHatch;
@@ -168,6 +186,41 @@ public class ConfigHolder {
         @Comment({ "En: Disable fly inertia when the player stops moving in the air.",
                 "Pt: Remove a inercia do voo quando o jogador para de se mover no ar." })
         public boolean disableFlyInertia = true;
+
+        @Configurable
+        @Comment({ "En: Show the wireless steam network HUD (balance, flow and connected hatches).",
+                "Pt: Mostra o HUD da rede wireless de vapor (saldo, fluxo e hatches conectados)." })
+        public boolean wirelessSteamHud = false;
+
+        @Configurable
+        @Comment({ "En: Show the Nexus wireless energy HUD.", "Pt: Mostra o HUD de energia wireless do Nexus." })
+        public boolean wirelessEnergyHud = false;
+
+        @Configurable
+        @Range(min = 0, max = 100)
+        public int wirelessEnergyHudX = 5;
+
+        @Configurable
+        @Range(min = 0, max = 100)
+        public int wirelessEnergyHudY = 60;
+
+        @Configurable
+        @Range(min = 0, max = 100)
+        @Comment({ "En: Wireless steam HUD horizontal position: 0 = left edge, 100 = right edge.",
+                "Pt: Posicao horizontal do HUD de vapor: 0 = esquerda, 100 = direita." })
+        public int wirelessSteamHudX = 5;
+
+        @Configurable
+        @Range(min = 0, max = 100)
+        @Comment({ "En: Wireless steam HUD vertical position: 0 = top edge, 100 = bottom edge.",
+                "Pt: Posicao vertical do HUD de vapor: 0 = topo, 100 = baixo." })
+        public int wirelessSteamHudY = 75;
+
+        @Configurable
+        @Range(min = 0, max = 600)
+        @Comment({ "En: Seconds of balance history drawn as a graph in the HUD (0 hides the graph).",
+                "Pt: Segundos de historico de saldo no grafico do HUD (0 esconde o grafico)." })
+        public int wirelessSteamHudHistorySeconds = 60;
     }
 
     public static class RestrictedItems {
@@ -212,28 +265,46 @@ public class ConfigHolder {
         public boolean enabled = true;
 
         @Configurable
-        @Comment("En: Tank capacity for bronze wireless steam hatches.")
-        public int bronzeBuffer = 20000;
+        @Comment({ "En: Tank capacity for the bronze wireless steam INPUT hatch (network -> machine).",
+                "En: Deliberately small: a huge input buffer let a single hatch hoard the whole pool,",
+                "En: which starved every other machine and made the network read 0 mB (the reported",
+                "En: 'network always 0' bug). The input hatch only bridges the gap until its machine",
+                "En: consumes the steam. 100,000 mB = 100 buckets." })
+        public int bronzeInputBuffer = 100000;
 
         @Configurable
-        @Comment("En: Tank capacity for steel wireless steam hatches.")
-        public int steelBuffer = Integer.MAX_VALUE;
+        @Comment({ "En: Tank capacity for the steel wireless steam INPUT hatch (network -> machine).",
+                "En: Integer.MAX_VALUE = effectively unbounded, like GTNL's steel wireless energy hatch." })
+        public int steelInputBuffer = Integer.MAX_VALUE;
 
         @Configurable
-        @Comment("En: Per-tick transfer limit for bronze wireless steam hatches.")
-        public int bronzeTransferRate = 10000;
+        @Comment({ "En: Tank capacity for the bronze wireless steam OUTPUT hatch (boiler -> network).",
+                "En: GTNL parity: the bronze wireless dynamo holds 128,000,000 mB. The buffer is the",
+                "En: real per-tick throughput limit: a large boiler can only move what fits in the tank,",
+                "En: so it must hold a whole recipe cycle (a 41x42 solar boiler makes 6,240,000 mB per",
+                "En: 20-tick cycle at the current balance). A small buffer voids the rest of the cycle." })
+        public int bronzeOutputBuffer = 128000000;
 
         @Configurable
-        @Comment("En: Per-tick transfer limit for steel wireless steam hatches.")
-        public int steelTransferRate = 1000000;
+        @Comment("En: Tank capacity for the steel wireless steam OUTPUT hatch (boiler -> network).")
+        public int steelOutputBuffer = Integer.MAX_VALUE;
+
+        @Configurable
+        @Comment({ "En: Optional per-tick transfer limit for bronze wireless steam hatches.",
+                "En: Integer.MAX_VALUE (the default) moves the whole buffer every tick, exactly like",
+                "En: GTNL's WirelessSteamDynamoHatch, so a boiler never strands its production. Lower",
+                "En: it only to deliberately throttle the wireless network." })
+        public int bronzeTransferRate = Integer.MAX_VALUE;
+
+        @Configurable
+        @Comment("En: Optional per-tick transfer limit for steel wireless steam hatches (default: whole buffer).")
+        public int steelTransferRate = Integer.MAX_VALUE;
     }
 
     public static class MachineToggles {
 
         @Configurable
         public boolean largeSteamCrusher = true;
-        @Configurable
-        public boolean megaPressureSolarBoiler = true;
         @Configurable
         public boolean largeSteamFurnace = true;
         @Configurable
@@ -252,6 +323,26 @@ public class ConfigHolder {
         public boolean largeSteamLathe = true;
         @Configurable
         public boolean largeSteamCutting = true;
+        public boolean largeSteamBending = true;
+        public boolean largeSteamExtruder = true;
+        public boolean largeSteamWiremill = true;
+        public boolean largeSteamSifter = true;
+        public boolean steamLavaMaker = true;
+        public boolean steamItemVault = true;
+        @Configurable
+        public boolean steamCactusWonder = true;
+        @Configurable
+        public boolean steamCracking = true;
+        @Configurable
+        public boolean megaSteamCompressor = true;
+        @Configurable
+        public boolean steamElevator = true;
+        @Configurable
+        public boolean steamElevatorModules = true;
+        @Configurable
+        public boolean steamApiaryModule = true;
+        @Configurable
+        public boolean steamBeeBreedingModule = true;
         @Configurable
         public boolean largeSteamFormingPress = true;
         @Configurable
@@ -286,6 +377,16 @@ public class ConfigHolder {
         public boolean nexusMeHypercore = true;
         @Configurable
         public boolean meStorage = true;
+        @Configurable
+        public boolean integratedOreProcessor = true;
+        @Configurable
+        public boolean advancedIntegratedOreProcessor = true;
+        @Configurable
+        public boolean brickKiln = true;
+        @Configurable
+        public boolean thermalPowerPump = true;
+        @Configurable
+        public boolean liquefactionFurnace = true;
         @Configurable
         public boolean durationTester = true;
     }
@@ -337,6 +438,8 @@ public class ConfigHolder {
         @Configurable
         public boolean meCraftPatternHatch = true;
         @Configurable
+        public boolean mePatternBufferProxy = true;
+        @Configurable
         public boolean meStorageAccessHatch = true;
         @Configurable
         public boolean meBigStorageAccessHatch = true;
@@ -352,13 +455,32 @@ public class ConfigHolder {
         public double accelerateHatchEnergyCost = 1.5;
 
         @Configurable
+        @Comment({ "En: Let a GTNA ME Pattern Buffer switch the machine mode of GTCEu multiblocks",
+                "En: (e.g. the Large Cutter between cutter and lathe). The buffer only drives the",
+                "En: mode while the machine is idle, so it never interrupts work; the buffer's own",
+                "En: per-slot mode pins and its buffer-level filter stay the manual control.",
+                "Pt: Permite que um ME Pattern Buffer do GTNA troque o modo de maquinas do GTCEu",
+                "Pt: (ex: Large Cutter entre cutter e lathe) enquanto a maquina estiver ociosa." })
+        public boolean bufferDrivenMachineMode = true;
+
+        @Configurable
+        @Comment({ "En: Enable RaishxCore crafting planner for Nexus ME Hypercore grids",
+                "Pt: Ativar planner RaishxCore nas redes do Nexus ME Hypercore" })
+        public boolean nexusPlannerEnabled = true;
+
+        @Configurable
         @Range(min = 1000, max = 1000000)
         public int wirelessSteamTransferRate = 8192;
 
         @Configurable
         @Range(min = 1, max = 100000)
-        @Comment("En: Steam produced per sunlit block per operation.")
-        public int megaSolarSteamPerBlock = 500;
+        @Comment({ "En: Steam produced per sunlit solar boiling cell per 20-tick cycle in the",
+                "En: Large Steam Solar Boiler (mB). 20x the original 200 mB: a 41x42 field makes",
+                "En: ~6,240,000 mB per second instead of ~312,000, which matches the massive",
+                "En: structure cost.",
+                "Pt: Vapor por celula solar por ciclo de 20 ticks no Large Steam Solar Boiler (mB).",
+                "Pt: 20x o valor original de 200 mB: um campo 41x42 passa a fazer ~6.240.000 mB/s." })
+        public int solarBoilerSteamPerCell = 4000;
 
         @Configurable
         @Range(min = 1, max = 64)
@@ -420,21 +542,6 @@ public class ConfigHolder {
         @Configurable
         @Comment("Max transfer capacity per tick for a MAX Tier array.")
         public String maxTransferTierMAX = "500000000000000000000000";
-
-        @Configurable
-        @Range(min = 1, max = 100)
-        @Comment("Threshold percentage (0-100) to activate Safe Mode.")
-        public int safeModeThreshold = 10;
-
-        @Configurable
-        @Range(min = 1, max = 100)
-        @Comment("Percentage (0-100) at which Safe Mode is deactivated.")
-        public int safeModeRecovery = 25;
-
-        @Configurable
-        @Range(min = 20, max = 72000)
-        @Comment("Cooldown in ticks between identical alerts.")
-        public int alertCooldownTicks = 1200;
 
         @Configurable
         @Comment("If false, efficiency uses the average capacitor tier. If true, it uses the highest installed tier.")

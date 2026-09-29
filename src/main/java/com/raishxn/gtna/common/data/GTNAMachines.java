@@ -21,6 +21,7 @@ import com.gregtechceu.gtceu.common.data.GTMachines;
 import com.gregtechceu.gtceu.common.data.GTMaterials;
 import com.gregtechceu.gtceu.common.data.GTRecipeTypes;
 import com.gregtechceu.gtceu.common.data.machines.GTMultiMachines;
+import com.gregtechceu.gtceu.utils.FormattingUtil;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.Direction;
@@ -28,7 +29,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraftforge.common.Tags;
 
 import com.raishxn.gtna.GTNACORE;
 import com.raishxn.gtna.api.machine.multiblock.GTNAPartAbility;
@@ -39,17 +39,26 @@ import com.raishxn.gtna.common.data.multiblock.DimensionallyTranscendentPatterns
 import com.raishxn.gtna.common.data.multiblock.EyeOfHarmonyAisles;
 import com.raishxn.gtna.common.data.multiblock.EyeOfWoodAisles;
 import com.raishxn.gtna.common.data.multiblock.GTNAMultiBlockFileReader;
+import com.raishxn.gtna.common.machine.multiMachineBase.SteamMultiMachineBase;
+import com.raishxn.gtna.common.machine.multiblock.electric.AdvancedIntegratedOreProcessorMachine;
+import com.raishxn.gtna.common.machine.multiblock.electric.IntegratedOreProcessorMachine;
+import com.raishxn.gtna.common.machine.multiblock.electric.LiquefactionFurnaceMachine;
+import com.raishxn.gtna.common.machine.multiblock.electric.UniversalFactoryMachine;
 import com.raishxn.gtna.common.machine.multiblock.energy.ArtificialStarMachine;
 import com.raishxn.gtna.common.machine.multiblock.energy.IndustrialSlaughterhouse;
 import com.raishxn.gtna.common.machine.multiblock.energy.MEStorageMachine;
 import com.raishxn.gtna.common.machine.multiblock.energy.NexusMEHyperCoreMachine;
 import com.raishxn.gtna.common.machine.multiblock.energy.NexusMolecularForgeMachine;
+import com.raishxn.gtna.common.machine.multiblock.module.steamElevator.SteamElevator;
+import com.raishxn.gtna.common.machine.multiblock.noenergy.BrickKilnMachine;
 import com.raishxn.gtna.common.machine.multiblock.noenergy.DimensionallyTranscendentDirtForgeMachine;
 import com.raishxn.gtna.common.machine.multiblock.noenergy.EyeOfHarmonyMachine;
 import com.raishxn.gtna.common.machine.multiblock.noenergy.EyeOfWoodMachine;
 import com.raishxn.gtna.common.machine.multiblock.noenergy.HyperPressureReactor;
 import com.raishxn.gtna.common.machine.multiblock.noenergy.InfernalCokeOven;
 import com.raishxn.gtna.common.machine.multiblock.noenergy.LeapForwardBlastFurnace;
+import com.raishxn.gtna.common.machine.multiblock.noenergy.PrimitiveStoneFurnaceMachine;
+import com.raishxn.gtna.common.machine.multiblock.noenergy.ThermalPowerPumpMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.steam.HugeSteamInputBus;
 import com.raishxn.gtna.common.machine.multiblock.part.steam.HugeSteamOutputBus;
@@ -87,9 +96,39 @@ public class GTNAMachines {
             "block/overlay/machine/overlay_item_hatch_input");
     private static final ResourceLocation OVERLAY_STEAM_OUT = new ResourceLocation("gtceu",
             "block/overlay/machine/overlay_item_hatch_output");
-    public static final BiConsumer<ItemStack, List<Component>> GTNA_ADD = (stack, components) -> components
-            .add(Component.translatable("gtna.registry.add")
-                    .withStyle(ChatFormatting.LIGHT_PURPLE));
+
+    /**
+     * Dynamic tooltip for the wireless steam hatches: attribution, the configured buffer and the
+     * effective per-tick transfer rate. The values are read lazily so the tooltip always reflects the
+     * live config (the registration runs before/around config load). Input and output hatches have
+     * separate buffers: a small input buffer keeps one hatch from hoarding the pool, while the output
+     * buffer has to hold a whole boiler cycle.
+     */
+    private static BiConsumer<ItemStack, List<Component>> wirelessSteamTooltip(boolean isSteel, boolean isInput) {
+        return (stack, components) -> {
+            if (ConfigHolder.INSTANCE == null) {
+                return;
+            }
+            var wirelessSteam = ConfigHolder.INSTANCE.wirelessSteam;
+            int buffer;
+            if (isInput) {
+                buffer = isSteel ? wirelessSteam.steelInputBuffer : wirelessSteam.bronzeInputBuffer;
+            } else {
+                buffer = isSteel ? wirelessSteam.steelOutputBuffer : wirelessSteam.bronzeOutputBuffer;
+            }
+            long rate = isSteel ? wirelessSteam.steelTransferRate : wirelessSteam.bronzeTransferRate;
+            components.add(Component.translatable("gtceu.universal.tooltip.fluid_storage_capacity", buffer)
+                    .withStyle(ChatFormatting.GRAY));
+            if (rate >= Integer.MAX_VALUE) {
+                components.add(Component.translatable("gtna.machine.wireless_steam.transfer_rate.unlimited")
+                        .withStyle(ChatFormatting.AQUA));
+            } else {
+                components.add(Component.translatable("gtna.machine.wireless_steam.transfer_rate",
+                        FormattingUtil.formatNumbers(rate))
+                        .withStyle(ChatFormatting.AQUA));
+            }
+        };
+    }
 
     // --- INPUT HATCHES (Recebe Vapor) ---
 
@@ -98,15 +137,14 @@ public class GTNAMachines {
                     .machine("wireless_steam_input_hatch", holder -> new WirelessSteamInputHatch(holder, false))
                     .tier(0)
                     .rotationState(RotationState.ALL)
-                    .abilities(PartAbility.STEAM, IMPORT_FLUIDS)
+                    .abilities(PartAbility.STEAM)
                     .colorOverlaySteamHullModel(OVERLAY_IN)
                     .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, false)
                     .modelProperty(IS_FORMED, false)
                     .tooltips(
                             Component.translatable("gtna.machine.wireless_steam_input.tooltip_desc")
-                                    .withStyle(ChatFormatting.GRAY),
-                            Component.translatable("gtceu.universal.tooltip.fluid_storage_capacity", 20000))
-                    .tooltipBuilder(GTNA_ADD)
+                                    .withStyle(ChatFormatting.GRAY))
+                    .tooltipBuilder(wirelessSteamTooltip(false, true))
                     .register());
 
     public static final MachineDefinition WIRELESS_STEAM_INPUT_HATCH_STEEL = registerHatch("wirelessSteamInputSteel",
@@ -114,15 +152,14 @@ public class GTNAMachines {
                     .machine("wireless_steam_input_hatch_steel", holder -> new WirelessSteamInputHatch(holder, true))
                     .tier(1)
                     .rotationState(RotationState.ALL)
-                    .abilities(PartAbility.STEAM, IMPORT_FLUIDS)
+                    .abilities(PartAbility.STEAM)
                     .colorOverlaySteamHullModel(OVERLAY_IN)
                     .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, true)
                     .modelProperty(IS_FORMED, false)
                     .tooltips(
                             Component.translatable("gtna.machine.wireless_steam_input.tooltip_desc")
-                                    .withStyle(ChatFormatting.GRAY),
-                            Component.translatable("gtceu.universal.tooltip.fluid_storage_capacity", Integer.MAX_VALUE))
-                    .tooltipBuilder(GTNA_ADD)
+                                    .withStyle(ChatFormatting.GRAY))
+                    .tooltipBuilder(wirelessSteamTooltip(true, true))
                     .register());
 
     // --- OUTPUT HATCHES (Envia Vapor) ---
@@ -132,7 +169,7 @@ public class GTNAMachines {
                     .machine("wireless_steam_output_hatch", holder -> new WirelessSteamOutputHatch(holder, false))
                     .tier(0)
                     .rotationState(RotationState.ALL)
-                    .abilities(PartAbility.STEAM, EXPORT_FLUIDS)
+                    .abilities(GTNAPartAbility.STEAM_EXPORT_FLUIDS)
                     .colorOverlaySteamHullModel(OVERLAY_OUT)
                     .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, false)
                     .modelProperty(IS_FORMED, false)
@@ -140,9 +177,8 @@ public class GTNAMachines {
                             Component.translatable("gtna.machine.wireless_steam_output.tooltip_desc")
                                     .withStyle(ChatFormatting.GRAY),
                             Component.translatable("gtna.machine.wireless_steam_output.tooltip_usage")
-                                    .withStyle(ChatFormatting.GOLD),
-                            Component.translatable("gtceu.universal.tooltip.fluid_storage_capacity", 20000))
-                    .tooltipBuilder(GTNA_ADD)
+                                    .withStyle(ChatFormatting.GOLD))
+                    .tooltipBuilder(wirelessSteamTooltip(false, false))
                     .register());
 
     public static final MachineDefinition WIRELESS_STEAM_OUTPUT_HATCH_STEEL = registerHatch("wirelessSteamOutputSteel",
@@ -150,7 +186,7 @@ public class GTNAMachines {
                     .machine("wireless_steam_output_hatch_steel", holder -> new WirelessSteamOutputHatch(holder, true))
                     .tier(1)
                     .rotationState(RotationState.ALL)
-                    .abilities(PartAbility.STEAM, EXPORT_FLUIDS)
+                    .abilities(GTNAPartAbility.STEAM_EXPORT_FLUIDS)
                     .colorOverlaySteamHullModel(OVERLAY_OUT)
                     .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, true)
                     .modelProperty(IS_FORMED, false)
@@ -158,9 +194,8 @@ public class GTNAMachines {
                             Component.translatable("gtna.machine.wireless_steam_output.tooltip_desc")
                                     .withStyle(ChatFormatting.GRAY),
                             Component.translatable("gtna.machine.wireless_steam_output.tooltip_usage")
-                                    .withStyle(ChatFormatting.GOLD),
-                            Component.translatable("gtceu.universal.tooltip.fluid_storage_capacity", Integer.MAX_VALUE))
-                    .tooltipBuilder(GTNA_ADD)
+                                    .withStyle(ChatFormatting.GOLD))
+                    .tooltipBuilder(wirelessSteamTooltip(true, false))
                     .register());
 
     public static final MachineDefinition HUGE_STEAM_INPUT_BUS = registerHatch("hugeSteamInputBus", () -> REGISTRATE
@@ -171,8 +206,7 @@ public class GTNAMachines {
             .modelProperty(IS_FORMED, false)
             .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, false)
             .colorOverlaySteamHullModel(OVERLAY_STEAM_IN)
-            .tooltipBuilder(GTNA_ADD)
-            .tooltips(Component.translatable("gtna.tooltip.huge_steam_bus").withStyle(ChatFormatting.GREEN))
+            .tooltips(Component.translatable("gtna.tooltip.huge_steam_input_bus").withStyle(ChatFormatting.GREEN))
             .register());
 
     public static final MachineDefinition HUGE_STEAM_OUTPUT_BUS = registerHatch("hugeSteamOutputBus", () -> REGISTRATE
@@ -183,8 +217,7 @@ public class GTNAMachines {
             .modelProperty(IS_FORMED, false)
             .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, false)
             .colorOverlaySteamHullModel(OVERLAY_STEAM_OUT)
-            .tooltips(Component.translatable("gtna.tooltip.huge_steam_bus").withStyle(ChatFormatting.GREEN))
-            .tooltipBuilder(GTNA_ADD)
+            .tooltips(Component.translatable("gtna.tooltip.huge_steam_output_bus").withStyle(ChatFormatting.GREEN))
             .register());
 
     public static final MachineDefinition INFINITE_STEAM_INPUT_BUS = registerHatch("infiniteSteamInputBus",
@@ -196,8 +229,6 @@ public class GTNAMachines {
                     .modelProperty(IS_FORMED, false)
                     .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, false)
                     .colorOverlaySteamHullModel(OVERLAY_STEAM_IN)
-                    .tooltips(Component.translatable("gtna.machine.infinite_steam_input_bus.tooltip"))
-                    .tooltipBuilder(GTNA_ADD)
                     .register());
 
     public static final MachineDefinition OUTPUT_BOOST_STEAM_OUTPUT_BUS = registerHatch("outputBoostSteamOutputBus",
@@ -209,9 +240,8 @@ public class GTNAMachines {
                     .modelProperty(IS_FORMED, false)
                     .modelProperty(GTMachineModelProperties.IS_STEEL_MACHINE, false)
                     .colorOverlaySteamHullModel(OVERLAY_STEAM_OUT)
-                    .tooltips(Component.translatable("gtna.machine.output_boost_steam_output_bus.tooltip",
+                    .tooltips(Component.translatable("gtna.machine.output_boost_steam_output_bus.boost",
                             OutputBoostHatchPartMachine.getMultiplierForTier(GTValues.ULV)))
-                    .tooltipBuilder(GTNA_ADD)
                     .register());
 
     public static final MachineDefinition INDUSTRIAL_PLATFORM_DEPLOYMENT_TOOLS = registerMachine(
@@ -226,7 +256,6 @@ public class GTNAMachines {
                     .tooltips(
                             Component.translatable("gtna.machine.industrial_platform_deployment_tools.tooltip.0"),
                             Component.translatable("gtna.machine.industrial_platform_deployment_tools.tooltip.1"))
-                    .tooltipBuilder(GTNA_ADD)
                     .register());
 
     // --- MULTIBLOCKS ---
@@ -242,172 +271,29 @@ public class GTNAMachines {
                             GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
                             GTCEu.id("block/multiblock/steam_grinder"))
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle(
-                                    "EEEEEEE",
-                                    "AAAAAAA",
-                                    "AAAAAAA",
-                                    "AAAAAAA",
-                                    "DDDDDDD",
-                                    "       ",
-                                    "       ",
-                                    "       ")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "A     A",
-                                    "ACCCCCA",
-                                    "A     A",
-                                    "ABBBBBA",
-                                    "DCCCCCD",
-                                    "DD   DD",
-                                    "       ")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "DBBBBBD",
-                                    "A     A",
-                                    "A     A",
-                                    "A     A",
-                                    "DD   DD",
-                                    "D     D",
-                                    "       ")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "ACCCCCA",
-                                    "DBBBBBD",
-                                    "ACCCCCA",
-                                    "AAAAAAA",
-                                    "ADDDDDA",
-                                    "A     A",
-                                    "ADDDDDA")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "DBBBBBD",
-                                    "A     A",
-                                    "A     A",
-                                    "AAAAAAA",
-                                    "AAAAAAA",
-                                    "AAAAAAA",
-                                    "AAAAAAA")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "ACCCCCA",
-                                    "AAAAAAA",
-                                    "AAAAAAA",
-                                    " AAAAA ",
-                                    "AAAAAAA",
-                                    "AAAAAAA",
-                                    "CAAAAAC")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "A     A",
-                                    "AAAAAAA",
-                                    " AAAAA ",
-                                    "       ",
-                                    " AAAAA ",
-                                    " AAAAA ",
-                                    "C     C")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "AAAAAAA",
-                                    "AADDDAA",
-                                    " ADDDA ",
-                                    "  DDD  ",
-                                    "  DDD  ",
-                                    "       ",
-                                    "C     C")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "AAAAAAA",
-                                    "  D D  ",
-                                    "  D D  ",
-                                    "  DDD  ",
-                                    "  DDD  ",
-                                    "       ",
-                                    "C     C")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "AAAAAAA",
-                                    "  DDD  ",
-                                    "  DDD  ",
-                                    "  DDD  ",
-                                    "  DDD  ",
-                                    "       ",
-                                    "C     C")
-                            .aisle(
-                                    "EEEEEEE",
-                                    "ACCCCCA",
-                                    "AAA~AAA",
-                                    "AAAAAAA",
-                                    "C     C",
-                                    "C     C",
-                                    "C     C",
-                                    "CCCCCCC")
+                            .aisle("EEEEE", "ADADA", "ADADA", "ADADA", "AAAAA", "     ")
+                            .aisle("EEEEE", "DBCBD", "DCBCD", "DBCBD", "A   A", "AAAAA")
+                            .aisle("EEEEE", "ACBCA", "ABCBA", "ACBCA", "A   A", "A   A")
+                            .aisle("EEEEE", "DBCBD", "DCBCD", "DBCBD", "A   A", "A   A")
+                            .aisle("EEEEE", "AAAAA", "AAAAA", "AAAAA", "AAAAA", "     ")
+                            .aisle("EEEEE", "DAAAD", "DACAD", "DAAAD", "     ", "     ")
+                            .aisle(" EEE ", " A~A ", " AAA ", "     ", "     ", "     ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .where('A', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
-                            .where('B', blocks(GTBlocks.CASING_STEEL_SOLID.get()))
-                            .where('C', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
-                            .where('D', blocks(GTBlocks.CASING_STEEL_SOLID.get()))
-                            .where('E', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
+                            .where('B', SteamMultiMachineBase.gearboxCasing())
+                            .where('C', SteamMultiMachineBase.pipeCasing())
+                            .where('D', SteamMultiMachineBase.frameCasing())
+                            .where('E', SteamMultiMachineBase.machineCasing())
                             .where(' ', Predicates.any())
                             .build())
-                    .tooltipBuilder(GTNA_ADD)
                     .tooltips(
                             Component.translatable("gtna.tooltip.large_steam_crusher.speed")
                                     .withStyle(ChatFormatting.GOLD),
                             Component.translatable("gtna.tooltip.large_steam_crusher.parallel")
                                     .withStyle(ChatFormatting.BLUE))
-                    .register());
-
-    public static final MultiblockMachineDefinition MEGA_PRESSURE_SOLAR_BOILER = registerMachine(
-            "megaPressureSolarBoiler", () -> REGISTRATE
-                    .multiblock("mega_pressure_solar_boiler", MegaSolarBoilerMachine::new)
-                    .rotationState(RotationState.NON_Y_AXIS)
-                    .recipeType(GTRecipeTypes.DUMMY_RECIPES)
-                    .appearanceBlock(GTNABlocks.HYPER_PRESSURE_BREEL_CASING)
-                    .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle("AAA", "ABA", "A~A")
-                            .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTNABlocks.HYPER_PRESSURE_BREEL_CASING.get())
-                                    .or(abilities(IMPORT_FLUIDS))
-                                    .or(abilities(EXPORT_FLUIDS)))
-                            .where('B', blocks(GTNABlocks.SOLAR_BOILING_CELL.get()))
-                            .build())
-                    .shapeInfos(definition -> {
-                        var minShape = MultiblockShapeInfo.builder()
-                                .aisle("A~A")
-                                .aisle("ABA")
-                                .aisle("AAA")
-                                .where('~', definition, Direction.NORTH)
-                                .where('A', GTNABlocks.HYPER_PRESSURE_BREEL_CASING.get())
-                                .where('B', GTNABlocks.SOLAR_BOILING_CELL.get())
-                                .build();
-                        return List.of(minShape);
-                    })
-                    .workableCasingModel(GTNACORE.id("block/casings/mega_pressure_solar_boiler_casing"),
-                            GTNACORE.id("block/overlay/machine/solarboiler"))
-                    .tooltips(
-                            Component
-                                    .translatable("gtna.tooltip.mega_solar.desc",
-                                            "A massive solar thermal power plant.")
-                                    .withStyle(ChatFormatting.GRAY),
-                            Component
-                                    .translatable("gtna.tooltip.mega_solar.expansion",
-                                            "Structure is expandable! Add Solar Pipes behind and to the sides.")
-                                    .withStyle(ChatFormatting.GOLD),
-                            Component
-                                    .translatable("gtna.tooltip.mega_solar.sunlight",
-                                            "REQUIREMENT: Every Solar Pipe casing must have direct access to the sky.")
-                                    .withStyle(ChatFormatting.RED),
-                            Component
-                                    .translatable("gtna.tooltip.mega_solar.production",
-                                            "Production: 10,000 L/s of Steam per active Pipe Block.")
-                                    .withStyle(ChatFormatting.BLUE),
-                            Component.translatable("gtna.tooltip.mega_solar.max_size", "Max Size: 33 Wide x 32 Deep.")
-                                    .withStyle(ChatFormatting.DARK_GRAY),
-                            Component.literal("Warning: May produce more steam than unplayed games in your library")
-                                    .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD))
                     .register());
 
     public static final MultiblockMachineDefinition LARGE_STEAM_FURNACE = registerMachine("largeSteamFurnace",
@@ -418,93 +304,33 @@ public class GTNAMachines {
                     .recipeModifier(LargeSteamFurnace::recipeModifier)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle(
-                                    "F_______F",
-                                    "D_______D",
-                                    "D_______D",
-                                    "D_______D",
-                                    "D_______D",
-                                    "D_______D",
-                                    "D_______D",
-                                    "F_______F")
-                            .aisle(
-                                    "FGGGGGGGF",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "FGGGGGGGF")
-                            .aisle(
-                                    "FGGGGGGGF",
-                                    "DABBBBBAD",
-                                    "DAHHHHHAD",
-                                    "DAHHHHHAD",
-                                    "DAHHHHHAD",
-                                    "DAHHHHHAD",
-                                    "DABBBBBAD",
-                                    "FGGGGGGGF")
-                            .aisle(
-                                    "FGGGGGGGF",
-                                    "DABBBBBAD",
-                                    "DAHDDDHAD",
-                                    "DAH   HAD",
-                                    "DAH   HAD",
-                                    "DAHDDDHAD",
-                                    "DABBBBBAD",
-                                    "FGGGGGGGF")
-                            .aisle(
-                                    "FGGGGGGGF",
-                                    "DABBBBBAD",
-                                    "DAHDDDHAD",
-                                    "DAH   HAD",
-                                    "DAH   HAD",
-                                    "DAHDDDHAD",
-                                    "DABBBBBAD",
-                                    "FGGGGGGGF")
-                            .aisle(
-                                    "FGGGGGGGF",
-                                    "DABBBBBAD",
-                                    "DAHDDDHAD",
-                                    "DAH   HAD",
-                                    "DAH   HAD",
-                                    "DAHDDDHAD",
-                                    "DABBBBBAD",
-                                    "FGGGGGGGF")
-                            .aisle(
-                                    "FGGGGGGGF",
-                                    "DAAAAAAAD",
-                                    "DAHHHHHAD",
-                                    "DAHHHHHAD",
-                                    "DAHHHHHAD",
-                                    "DAHHHHHAD",
-                                    "DAAAAAAAD",
-                                    "FGGGGGGGF")
-                            .aisle(
-                                    "FFFFFFFFF",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAASAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "DAAAAAAAD",
-                                    "FFFFFFFFF")
-                            .where('S', Predicates.controller(Predicates.blocks(definition.get())))
-                            .where('A', Predicates.blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .aisle(" CCCCC ", " AAAAA ", " DDDDD ", "  D D  ", "  D D  ", "  D D  ", "  D D  ",
+                                    "       ")
+                            .aisle("CEEEEEC", "AFFFFFA", "DFFFFFD", " FFFFF ", " FFFFF ", " FFFFF ", " FFFFF ",
+                                    "  F F  ")
+                            .aisle("CEEEEEC", "AFFFFFA", "DF F FD", " F F F ", " F F F ", " F F F ", " F F F ",
+                                    " F F F ")
+                            .aisle("CEEEEEC", "AFFFFFA", "DFFFFFD", " FFFFF ", " FFFFF ", " FFFFF ", " FFFFF ",
+                                    "  F F  ")
+                            .aisle("CEEEEEC", "AAAAAAA", "DABBBAD", " ABBBA ", "  BBB  ", "  BBB  ", "       ",
+                                    "       ")
+                            .aisle("CEEEEEC", "AAAAAAA", "DAB BAD", " AB BA ", " DB BD ", " DB BD ", "       ",
+                                    "       ")
+                            .aisle("CEEEEEC", "AAAAAAA", "DABBBAD", " ABBBA ", "  BBB  ", "  BBB  ", "       ",
+                                    "       ")
+                            .aisle(" CCCCC ", " AAAAA ", " DA~AD ", "  AAA  ", "  AAA  ", "       ", "       ",
+                                    "       ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
-                            .where('B', Predicates.blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('C', Predicates.blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('D',
-                                    Predicates.blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('E', Predicates.blocks(GTBlocks.CASING_STEEL_SOLID.get()))
-                            .where('F', Predicates.blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
-                            .where('G', Predicates.blocks(Blocks.STONE_BRICKS))
-                            .where('H', Predicates.blocks(GTBlocks.CASING_STEEL_SOLID.get()))
-                            .where(' ', Predicates.air())
-                            .where('_', Predicates.any())
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
+                            .where('B', SteamMultiMachineBase.pipeCasing())
+                            .where('C', SteamMultiMachineBase.fireboxCasing())
+                            .where('D', SteamMultiMachineBase.frameCasing())
+                            .where('E', SteamMultiMachineBase.machineCasing())
+                            .where('F', SteamMultiMachineBase.industrialCasing())
+                            .where(' ', Predicates.any())
                             .build())
                     .workableCasingModel(GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
                             GTCEu.id("block/multiblock/steam_oven"))
@@ -534,8 +360,8 @@ public class GTNAMachines {
                                             "Structure: GTOCore large steam furnace shell. Check JEI for details.")
                                     .withStyle(ChatFormatting.DARK_GRAY),
 
-                            Component.literal(
-                                    "Warning: Do not attempt to bake cookies inside. They will vaporize instantly.")
+                            Component
+                                    .translatable("gtna.tooltip.large_steam_furnace.warning")
                                     .withStyle(ChatFormatting.DARK_RED, ChatFormatting.BOLD))
                     .register());
 
@@ -555,7 +381,7 @@ public class GTNAMachines {
                             .aisle(
                                     "BBB",
                                     "A A",
-                                    "A A",
+                                    "AAA",
                                     "AAA")
                             .aisle(
                                     "BBB",
@@ -563,11 +389,11 @@ public class GTNAMachines {
                                     "AAA",
                                     " A ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .where('A', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
-                            .where('B', blocks(GTBlocks.FIREBOX_BRONZE.get()))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
+                            .where('B', SteamMultiMachineBase.fireboxCasing())
                             .where(' ', any())
                             .build())
                     .workableCasingModel(
@@ -622,12 +448,12 @@ public class GTNAMachines {
                                     "       ",
                                     "       ", "       ", "   A   ", "  AAA  ", "  AAA  ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .where('A', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('C', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
+                            .where('B', SteamMultiMachineBase.gearboxCasing())
+                            .where('C', SteamMultiMachineBase.frameCasing())
                             .where('D', blocks(Blocks.IRON_BLOCK))
                             .where('E', blocks(Blocks.GLASS))
                             .where(' ', Predicates.air())
@@ -667,12 +493,12 @@ public class GTNAMachines {
                             .aisle(" AAAAA ", " ABBBA ", " CEEEC ", " CEEEC ", " CEEEC ", " ABBBA ", " AAAAA ")
                             .aisle("  AAA  ", "  A~A  ", "       ", "       ", "       ", "  AAA  ", "  AAA  ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .where('A', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('C', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
+                            .where('B', SteamMultiMachineBase.gearboxCasing())
+                            .where('C', SteamMultiMachineBase.frameCasing())
                             .where('D', blocks(Blocks.IRON_BLOCK))
                             .where('E', blocks(Blocks.GLASS))
                             .where(' ', Predicates.air())
@@ -709,13 +535,13 @@ public class GTNAMachines {
                             .aisle("C   C", "DDCDD", "DAAAD", "DB BD", "DD DD")
                             .aisle("C   C", "DD~DD", "DAAAD", "DDDDD", " DDD ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('C', blocks(Blocks.GLASS))
-                            .where('D', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .where('A', SteamMultiMachineBase.gearboxCasing())
+                            .where('B', SteamMultiMachineBase.pipeCasing())
+                            .where('C', SteamMultiMachineBase.frameCasing())
+                            .where('D', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
                             .where(' ', Predicates.air())
                             .build())
                     .workableCasingModel(
@@ -744,24 +570,25 @@ public class GTNAMachines {
                     .recipeModifier(LargeSteamOreWasher::recipeModifier)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle("AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA")
-                            .aisle("AAAAAAAAA", "A   B   A", "A       A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAAAAAAA", "A   B   A", "A       A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAAAAAAA", "A   B   A", "A   B   A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAAAAAAA", "ABBBBBBBA", "A  BBB  A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAAAAAAA", "A   B   A", "A   B   A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAAAAAAA", "A   B   A", "A       A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAAAAAAA", "A   B   A", "A       A", "A       A", "ACCCCCCCA")
-                            .aisle("AAAA~AAAA", "AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA")
+                            .aisle("BBBBB", "DBBBD", "DBBBD", "D   D", " DDD ", " BBB ")
+                            .aisle("BBBBB", "ABBBA", "ACCCA", "ABBBA", "DBBBD", "B   B")
+                            .aisle("BBBBB", "AB BA", "AC CA", "AB BA", "DB BD", "B   B")
+                            .aisle("BBBBB", "ABBBA", "ACCCA", "ABBBA", "DBBBD", "B   B")
+                            .aisle("BBBBB", "DBBBD", "DCCCD", "D   D", " DDD ", " BBB ")
+                            .aisle("BBBBB", "B C B", "B   B", "     ", "     ", "     ")
+                            .aisle("BBBBB", "BCCCB", "B   B", "     ", "     ", "     ")
+                            .aisle("BBBBB", "B C B", "B   B", "     ", "     ", "     ")
+                            .aisle(" BBB ", " B~B ", " BBB ", "     ", "     ", "     ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .where('A', blocks(Blocks.GLASS))
+                            .where('B', SteamMultiMachineBase.machineCasing()
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(IMPORT_FLUIDS).setPreviewCount(1)))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('C', blocks(Blocks.GLASS))
-                            .where(' ', Predicates.air())
+                            .where('C', SteamMultiMachineBase.pipeCasing())
+                            .where('D', SteamMultiMachineBase.frameCasing())
+                            .where(' ', Predicates.any())
                             .build())
                     .workableCasingModel(
                             GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
@@ -788,22 +615,20 @@ public class GTNAMachines {
                     .recipeType(GTRecipeTypes.CIRCUIT_ASSEMBLER_RECIPES)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle("AAA", "AAA", "DDD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ABA", "DCD", " D ")
-                            .aisle("AAA", "ASA", "DDD", " D ")
-                            .where('S', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('C', blocks(GTNABlocks.STEAM_ASSEMBLY_BLOCK.get()))
-                            .where('D', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
+                            .aisle("BBB", "BBB", "BBB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "BCB", "BAB", " B ")
+                            .aisle("BBB", "B~B", "BBB", " B ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', blocks(GTNABlocks.STEAM_ASSEMBLY_BLOCK.get()))
+                            .where('B', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1)
                                             .setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1)
@@ -811,6 +636,7 @@ public class GTNAMachines {
                                     .or(abilities(IMPORT_FLUIDS).setMaxGlobalLimited(2))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(2))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(1)))
+                            .where('C', SteamMultiMachineBase.pipeCasing())
                             .where(' ', any())
                             .build())
                     .workableCasingModel(
@@ -836,36 +662,27 @@ public class GTNAMachines {
                     .recipeType(GTRecipeTypes.MIXER_RECIPES)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle(" AAAAAAA ", " AAAAAAA ", " AAAAAAA ", " AAAAAAA ", " AAAAAAA ", " AAAAAAA ",
-                                    " AAAAAAA ")
-                            .aisle("AAAAAAAAA", "AA     AA", "AA     AA", "AA     AA", "AA     AA", "AA     AA",
-                                    "AA  B  AA")
-                            .aisle("AAAAAAAAA", "A       A", "A   C   A", "A       A", "A   C   A", "A       A",
-                                    "A   B   A")
-                            .aisle("AAAAAAAAA", "A       A", "A   C   A", "A       A", "A   C   A", "A       A",
-                                    "A   B   A")
-                            .aisle("AAAAAAAAA", "A   D   A", "A CCCCC A", "A   D   A", "A CCCCC A", "A   D   A",
-                                    "ABBBBBBBA")
-                            .aisle("AAAAAAAAA", "A       A", "A   C   A", "A       A", "A   C   A", "A       A",
-                                    "A   B   A")
-                            .aisle("AAAAAAAAA", "A       A", "A   C   A", "A       A", "A   C   A", "A       A",
-                                    "A   B   A")
-                            .aisle("AAAAAAAAA", "AA     AA", "AA     AA", "AA     AA", "AA     AA", "AA     AA",
-                                    "AA  B  AA")
-                            .aisle(" AAAAAAA ", " AAASAAA ", " AAAAAAA ", " AAAAAAA ", " AAAAAAA ", " AAAAAAA ",
-                                    " AAAAAAA ")
-                            .where('S', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .aisle("  DDD  ", "  EAE  ", "  EAE  ", "  EAE  ", "  EAE  ", "  EAE  ", "  DDD  ")
+                            .aisle(" DAAAD ", " AFBFA ", " AFBFA ", " AFBFA ", " AFBFA ", " AFBFA ", " DAAAD ")
+                            .aisle("DAAAAAD", "EF C FE", "EFCCCFE", "EFB BFE", "EFCCCFE", "EF   FE", "DAAAAAD")
+                            .aisle("DAAAAAD", "ABCCCBA", "ABCCCBA", "AB B BA", "ABCCCBA", "AB C BA", "DAAAAAD")
+                            .aisle("DAAAAAD", "EF C FE", "EFCCCFE", "EFB BFE", "EFCCCFE", "EF   FE", "DAAAAAD")
+                            .aisle(" DAAAD ", " AFBFA ", " AFBFA ", " AFBFA ", " AFBFA ", " AFBFA ", " DAAAD ")
+                            .aisle("  DDD  ", "  EAE  ", "  EAE  ", "  E~E  ", "  EAE  ", "  EAE  ", "  DDD  ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_FLUIDS).setMaxGlobalLimited(2))
                                     .or(abilities(EXPORT_FLUIDS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(4))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(1)))
-                            .where('B', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('C', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('D', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
+                            .where('B', SteamMultiMachineBase.gearboxCasing())
+                            .where('C', SteamMultiMachineBase.pipeCasing())
+                            .where('D', SteamMultiMachineBase.fireboxCasing())
+                            .where('E', blocks(Blocks.GLASS))
+                            .where('F', SteamMultiMachineBase.industrialCasing())
                             .where(' ', any())
                             .build())
                     .workableCasingModel(
@@ -891,30 +708,33 @@ public class GTNAMachines {
                     .recipeType(GTRecipeTypes.CENTRIFUGE_RECIPES)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle("           ", "   AAAAA   ", "  AAAAAAA  ", "   AAAAA   ", "           ")
-                            .aisle("  AAAAAAA  ", "  A     A  ", " AB     BA ", "  A     A  ", "  AAAAAAA  ")
-                            .aisle(" AAAAAAAAA ", " A       A ", "AB   C   BA", " A       A ", " AAAAAAAAA ")
-                            .aisle(" AAAAAAAAA ", "A         A", "A    C    A", "A         A", " AAAAAAAAA ")
-                            .aisle(" AAAAAAAAA ", "A    E    A", "A    C    A", "A         A", " AAAAAAAAA ")
-                            .aisle(" AAAAAAAAA ", "A   ECE   A", "A CCCCCCC A", "A    C    A", " AAAAFAAAA ")
-                            .aisle(" AAAAAAAAA ", "A    E    A", "A    C    A", "A         A", " AAAAAAAAA ")
-                            .aisle(" AAAAAAAAA ", "A         A", "A    C    A", "A         A", " AAAAAAAAA ")
-                            .aisle(" AAAAAAAAA ", " A       A ", "AB   C   BA", " A       A ", " AAAAAAAAA ")
-                            .aisle("  AAAAAAA  ", "  A     A  ", " AB     BA ", "  A     A  ", "  AAAAAAA  ")
-                            .aisle("           ", "   AAAAA   ", "  AAASAAA  ", "   AAAAA   ", "           ")
-                            .where('S', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .aisle("  AAA  ", "  AEA  ", "  AEA  ", "  AEA  ", "  AEA  ", "  AEA  ", "  AEA  ",
+                                    "  AEA  ", "  AAA  ", "       ")
+                            .aisle(" AAAAA ", " DC CD ", " DB BD ", " DC CD ", " DB BD ", " DC CD ", " DB BD ",
+                                    " DC CD ", " AAAAA ", "  AAA  ")
+                            .aisle("AAAAAAA", "AC   CA", "AB   BA", "AC   CA", "AB   BA", "AC   CA", "AB   BA",
+                                    "AC   CA", "AA   AA", " AAAAA ")
+                            .aisle("AAAAAAA", "E     E", "E     E", "E     E", "E     E", "E     E", "E     E",
+                                    "E     E", "A     A", " AABAA ")
+                            .aisle("AAAAAAA", "AC   CA", "AB   BA", "AC   CA", "AB   BA", "AC   CA", "AB   BA",
+                                    "AC   CA", "AA   AA", " AAAAA ")
+                            .aisle(" AAAAA ", " DC CD ", " DB BD ", " DC CD ", " DB BD ", " DC CD ", " DB BD ",
+                                    " DC CD ", " AAAAA ", "  AAA  ")
+                            .aisle("  A~A  ", "  AEA  ", "  AEA  ", "  AEA  ", "  AEA  ", "  AEA  ", "  AEA  ",
+                                    "  AEA  ", "  AAA  ", "       ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(4))
                                     .or(abilities(IMPORT_FLUIDS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_FLUIDS).setMaxGlobalLimited(4)))
-                            .where('B', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('C', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('E', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('F', abilities(MUFFLER).setExactLimit(1))
+                            .where('B', SteamMultiMachineBase.gearboxCasing())
+                            .where('C', SteamMultiMachineBase.pipeCasing())
+                            .where('D', SteamMultiMachineBase.frameCasing())
+                            .where('E', blocks(Blocks.GLASS))
                             .where(' ', any())
                             .build())
                     .workableCasingModel(
@@ -940,24 +760,23 @@ public class GTNAMachines {
                     .recipeType(GTRecipeTypes.THERMAL_CENTRIFUGE_RECIPES)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle(" AAAAA ", " BBBBB ", " BBBBB ", " BBBBB ", "       ")
-                            .aisle("ABBABBA", "BC   CB", "BC   CB", "BC   CB", " BBBBB ")
-                            .aisle("ABAAABA", "B     B", "B     B", "B     B", " BBBBB ")
-                            .aisle("AAAAAAA", "B  D  B", "B  D  B", "B  D  B", " BBEBB ")
-                            .aisle("ABAAABA", "B     B", "B     B", "B     B", " BBBBB ")
-                            .aisle("ABBABBA", "BC   CB", "BC   CB", "BC   CB", " BBBBB ")
-                            .aisle(" AAAAA ", " BBBBB ", " BBSBB ", " BBBBB ", "       ")
-                            .where('S', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.FIREBOX_BRONZE.get()))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .aisle(" CCCCC ", " AAAAA ", " AAAAA ", " AAAAA ", "       ")
+                            .aisle("CAACAAC", "AD   DA", "AD   DA", "AD   DA", " AAAAA ")
+                            .aisle("CACCCAC", "A     A", "A     A", "A     A", " AAAAA ")
+                            .aisle("CCCCCCC", "A  B  A", "A  B  A", "A  B  A", " AAAAA ")
+                            .aisle("CACCCAC", "A     A", "A     A", "A     A", " AAAAA ")
+                            .aisle("CAACAAC", "AD   DA", "AD   DA", "AD   DA", " AAAAA ")
+                            .aisle(" CCCCC ", " AAAAA ", " AA~AA ", " AAAAA ", "       ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(3)))
-                            .where('C', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('D', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('E', abilities(MUFFLER).setExactLimit(1))
+                            .where('B', SteamMultiMachineBase.pipeCasing())
+                            .where('C', SteamMultiMachineBase.fireboxCasing())
+                            .where('D', SteamMultiMachineBase.frameCasing())
                             .where(' ', any())
                             .build())
                     .workableCasingModel(
@@ -983,28 +802,23 @@ public class GTNAMachines {
                     .recipeType(GTRecipeTypes.CHEMICAL_BATH_RECIPES)
                     .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
                     .pattern(definition -> FactoryBlockPattern.start()
-                            .aisle("AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA", "AAAAAAAAA")
-                            .aisle("AAAAAAAAA", "ABBBBBBBA", "ABBBDBBBA", "ABBBBBBBA", "AAAAAAAAA")
-                            .aisle("AAAAAAAAA", "AB     BA", "AB  D  BA", "AB     BA", "AACCCCCAA")
-                            .aisle("AAAAAAAAA", "AB     BA", "A   D   A", "AB     BA", "AACCCCCAA")
-                            .aisle("AAAAAAAAA", "AB     BA", "A   D   A", "AB     BA", "AACCCCCAA")
-                            .aisle("AAAAAAAAA", "AB     BA", "A   D   A", "AB     BA", "AACCCCCAA")
-                            .aisle("AAAAAAAAA", "AB     BA", "A   D   A", "AB     BA", "AACCCCCAA")
-                            .aisle("AAAAAAAAA", "AB     BA", "AB  D  BA", "AB     BA", "AACCCCCAA")
-                            .aisle("AAAAAAAAA", "ABBBBBBBA", "ABBBDBBBA", "ABBBBBBBA", "AAAAAAAAA")
-                            .aisle("AAAAAAAAA", "AAAAAAAAA", "AAAASAAAA", "AAAAAAAAA", "AAAAAAAAA")
-                            .where('S', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .aisle("BBBBBBB", "BBBBAAB", " BBBAAB", "  BAAAB", "   BBB ", "       ")
+                            .aisle("BBBBBBB", "BBBCCCA", " BBCCCA", "  BCCCA", "  B   B", "       ")
+                            .aisle("BBBBBBB", "DBBC CA", "DBBC CA", "D BC CA", "D B D B", "DDDDD  ")
+                            .aisle("BBBBBBB", "BBBCCCA", " BBCCCA", "  BCCCA", "  B   B", "       ")
+                            .aisle("BBBBBBB", "BB~BAAB", " BBBAAB", "  BAAAB", "   BBB ", "       ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', blocks(Blocks.GLASS))
+                            .where('B', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(3))
                                     .or(abilities(IMPORT_FLUIDS).setMaxGlobalLimited(1)))
-                            .where('B', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('C', blocks(Blocks.GLASS))
-                            .where('D', blocks(ChemicalHelper.getBlock(TagPrefix.block, GTMaterials.Potin)))
-                            .where(' ', air())
+                            .where('C', SteamMultiMachineBase.pipeCasing())
+                            .where('D', SteamMultiMachineBase.frameCasing())
+                            .where(' ', any())
                             .build())
                     .workableCasingModel(
                             GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
@@ -1044,9 +858,7 @@ public class GTNAMachines {
                                             .setMaxGlobalLimited(2))
                                     .or(blocks(GTMachines.FLUID_IMPORT_HATCH[GTValues.MV].getBlock())
                                             .setMaxGlobalLimited(2)))
-                            .where('S', blocks(GTMachines.STEAM_HATCH.getBlock())
-                                    .or(blocks(WIRELESS_STEAM_INPUT_HATCH.getBlock()))
-                                    .or(blocks(WIRELESS_STEAM_INPUT_HATCH_STEEL.getBlock())))
+                            .where('S', abilities(PartAbility.STEAM))
                             .where('B', blocks(GTBlocks.STEEL_HULL.get())
                                     .or(blocks(GTMachines.FLUID_EXPORT_HATCH[GTValues.LV].getBlock())
                                             .setMaxGlobalLimited(6))
@@ -1094,17 +906,17 @@ public class GTNAMachines {
                             .aisle("BAAAAAB", "BADDDAB", " AHHHA ", " EFFFE ")
                             .aisle(" BBBBB ", "  B~B  ", "       ", "       ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .where('A', SteamMultiMachineBase.industrialCasing())
+                            .where('B', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2)))
-                            .where('C', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('D', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('E', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('F', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
+                            .where('C', SteamMultiMachineBase.gearboxCasing())
+                            .where('D', SteamMultiMachineBase.pipeCasing())
+                            .where('E', SteamMultiMachineBase.frameCasing())
+                            .where('F', SteamMultiMachineBase.frameCasing())
                             .where('G', blocks(Blocks.IRON_BLOCK))
                             .where('H', blocks(Blocks.GLASS))
                             .where(' ', any())
@@ -1138,19 +950,19 @@ public class GTNAMachines {
                             .aisle("AAFFFFFAA", "AAG   GAA", " AE C EA ", "  BGGGB  ")
                             .aisle(" GBBBBBG ", " GBB~BBG ", "  GEEEG  ", "   BBB   ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .where('A', SteamMultiMachineBase.industrialCasing())
+                            .where('B', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2))
                                     .or(abilities(IMPORT_FLUIDS).setMaxGlobalLimited(1)))
-                            .where('C', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('D', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
-                            .where('E', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Bronze)))
-                            .where('F', blocks(Blocks.BRICKS))
-                            .where('G', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
+                            .where('C', SteamMultiMachineBase.gearboxCasing())
+                            .where('D', SteamMultiMachineBase.pipeCasing())
+                            .where('E', SteamMultiMachineBase.frameCasing())
+                            .where('F', SteamMultiMachineBase.machineCasing())
+                            .where('G', SteamMultiMachineBase.frameCasing())
                             .where('H', blocks(Blocks.DIAMOND_BLOCK))
                             .where(' ', any())
                             .build())
@@ -1168,6 +980,1107 @@ public class GTNAMachines {
                                     .withStyle(ChatFormatting.BLUE))
                     .register());
 
+    public static final MultiblockMachineDefinition LARGE_STEAM_BENDING = registerMachine("largeSteamBending",
+            () -> REGISTRATE
+                    .multiblock("large_steam_bending",
+                            holder -> new AdjustableSteamParallelMachine(holder, GTRecipeTypes.BENDER_RECIPES, 16, 16,
+                                    0.5, true))
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.BENDER_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createLargeSteamBendingPattern)
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTCEu.id("block/multiblock/gcym/large_material_press"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.large_steam_bending.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.large_steam_bending.speed")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.large_steam_bending.efficiency")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.large_steam_bending.parallel")
+                                    .withStyle(ChatFormatting.BLUE))
+                    .register());
+
+    public static final MultiblockMachineDefinition LARGE_STEAM_EXTRUDER = registerMachine("largeSteamExtruder",
+            () -> REGISTRATE
+                    .multiblock("large_steam_extruder",
+                            holder -> new AdjustableSteamParallelMachine(holder, GTRecipeTypes.EXTRUDER_RECIPES, 16, 16,
+                                    0.5, true))
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.EXTRUDER_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createLargeSteamExtruderPattern)
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTCEu.id("block/multiblock/gcym/large_material_press"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.large_steam_extruder.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.large_steam_extruder.speed")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.large_steam_extruder.efficiency")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.large_steam_extruder.parallel")
+                                    .withStyle(ChatFormatting.BLUE))
+                    .register());
+
+    public static final MultiblockMachineDefinition LARGE_STEAM_WIREMILL = registerMachine("largeSteamWiremill",
+            () -> REGISTRATE
+                    .multiblock("large_steam_wiremill",
+                            holder -> new AdjustableSteamParallelMachine(holder, GTRecipeTypes.WIREMILL_RECIPES, 16, 16,
+                                    0.5, true))
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.WIREMILL_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createLargeSteamWiremillPattern)
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTCEu.id("block/multiblock/gcym/large_material_press"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.large_steam_wiremill.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.large_steam_wiremill.speed")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.large_steam_wiremill.efficiency")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.large_steam_wiremill.parallel")
+                                    .withStyle(ChatFormatting.BLUE))
+                    .register());
+
+    public static final MultiblockMachineDefinition LARGE_STEAM_SIFTER = registerMachine("largeSteamSifter",
+            () -> REGISTRATE
+                    .multiblock("large_steam_sifter",
+                            holder -> new AdjustableSteamParallelMachine(holder, GTRecipeTypes.SIFTER_RECIPES, 16, 16,
+                                    0.5, true))
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.SIFTER_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createLargeSteamSifterPattern)
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTCEu.id("block/multiblock/gcym/large_material_press"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.large_steam_sifter.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.large_steam_sifter.speed")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.large_steam_sifter.efficiency")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.large_steam_sifter.parallel")
+                                    .withStyle(ChatFormatting.BLUE))
+                    .register());
+
+    public static final MultiblockMachineDefinition STEAM_LAVA_MAKER = registerMachine("steamLavaMaker",
+            () -> REGISTRATE
+                    .multiblock("steam_lava_maker", SteamLavaMakerMachine::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTNARecipeType.LAVA_MAKER_RECIPES)
+                    .recipeModifier(SteamLavaMakerMachine::recipeModifier)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createSteamLavaMakerPattern)
+                    // Overlay ported from GTNL SteamLavaMaker (iconsets/SteamLavaMaker).
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTNACORE.id("block/multiblock/steam_lava_maker"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.steam_lava_maker.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.steam_lava_maker.speed")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.steam_lava_maker.efficiency")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.steam_lava_maker.parallel")
+                                    .withStyle(ChatFormatting.BLUE))
+                    .register());
+
+    public static final MultiblockMachineDefinition STEAM_ITEM_VAULT = registerMachine("steamItemVault",
+            () -> REGISTRATE
+                    .multiblock("steam_item_vault", SteamItemVaultMachine::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createSteamItemVaultPattern)
+                    // Overlay ported from GTNL SteamItemVault (iconsets/SteamItemVault).
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTNACORE.id("block/multiblock/steam_item_vault"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.steam_item_vault.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.steam_item_vault.capacity")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.steam_item_vault.access")
+                                    .withStyle(ChatFormatting.BLUE))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Steam Cactus Wonder (GTNL port, LGPLv3) - fuel-burning steam generator.
+    // GTNL burns its GT++ cactus charcoal/coke ladder; GTNA has no cactus items, so the
+    // recipe type uses GTNA's closest carbon fuels (see GTNAMachineRecipes).
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition STEAM_CACTUS_WONDER = registerMachine("steamCactusWonder",
+            () -> REGISTRATE
+                    .multiblock("steam_cactus_wonder", SteamCactusWonder::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTNARecipeType.CACTUS_WONDER_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createSteamCactusWonderPattern)
+                    // Overlay ported from GTNL SteamCactusWonder (iconsets/CactusWonder).
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTNACORE.id("block/multiblock/steam_cactus_wonder"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.steam_cactus_wonder.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.steam_cactus_wonder.offer")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.steam_cactus_wonder.fuel")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.steam_cactus_wonder.structure")
+                                    .withStyle(ChatFormatting.DARK_GRAY))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Steam Cracking (GTNL port, LGPLv3) - uses GTCEu's CRACKING_RECIPES.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition STEAM_CRACKING = registerMachine("steamCracking",
+            () -> REGISTRATE
+                    .multiblock("steam_cracking", SteamCracking::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.CRACKING_RECIPES)
+                    .recipeModifier(SteamCracking::recipeModifier)
+                    .appearanceBlock(GTBlocks.CASING_BRONZE_BRICKS)
+                    .pattern(GTNAMachines::createSteamCrackingPattern)
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_bronze_plated_bricks"),
+                            GTCEu.id("block/multiblock/cracking_unit"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.steam_cracking.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.steam_cracking.cracking")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.steam_cracking.parallel")
+                                    .withStyle(ChatFormatting.BLUE),
+                            Component.translatable("gtna.tooltip.steam_cracking.structure")
+                                    .withStyle(ChatFormatting.DARK_GRAY))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Mega Steam Compressor (GTNL port, LGPLv3) - 256-parallel steam compressor.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition MEGA_STEAM_COMPRESSOR = registerMachine("megaSteamCompressor",
+            () -> REGISTRATE
+                    .multiblock("steam_mega_compressor", MegaSteamCompressor::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.COMPRESSOR_RECIPES)
+                    .recipeModifier(MegaSteamCompressor::recipeModifier)
+                    .appearanceBlock(GTBlocks.CASING_STEEL_SOLID)
+                    .pattern(GTNAMachines::createMegaSteamCompressorPattern)
+                    // Overlay ported from GTNL MegaSteamCompressor (iconsets/MegaSteamCompressor).
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_solid_steel"),
+                            GTNACORE.id("block/multiblock/steam_mega_compressor"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.mega_steam_compressor.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.mega_steam_compressor.parallel")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.mega_steam_compressor.speed")
+                                    .withStyle(ChatFormatting.GREEN),
+                            Component.translatable("gtna.tooltip.mega_steam_compressor.structure")
+                                    .withStyle(ChatFormatting.DARK_GRAY))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Steam Elevator (GTNL port, LGPLv3) - modular multiblock: burns steam into an internal EU
+    // buffer and powers module parts (one part ability per capability). The 35x43x35 structure is
+    // read from pattern/steam_elevator.mbs (same runtime reader as the ME Hypercore).
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition STEAM_ELEVATOR = registerMachine("steamElevator",
+            () -> REGISTRATE
+                    .multiblock("steam_elevator", SteamElevator::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    // The module slots are resolved with RelativeDirection.offsetPos, which is exact
+                    // for the default upwards facing and no flip; the tower is symmetric, so locking
+                    // those two out costs nothing.
+                    .allowExtendedFacing(false)
+                    .allowFlip(false)
+                    // No real recipes: DUMMY keeps getRecipeType() safe for the inert recipe logic.
+                    .recipeType(GTRecipeTypes.DUMMY_RECIPES)
+                    // GTNL's SteamElevator#getCasingTextureID is SolidSteelMachineCasing: the shell
+                    // is steel-reinforced wood (element A in the pattern), but the controller itself
+                    // is solid machine casing.
+                    .appearanceBlock(GTBlocks.CASING_STEEL_SOLID)
+                    .pattern(GTNAMachines::createSteamElevatorPattern)
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_solid_steel"),
+                            // GTNL's elevator uses the Tectech icon gregtech:iconsets/EM_COMPUTER,
+                            // which is NOT vendored in the GTNL repo (it lives in GT5U/GregTech). The
+                            // closest available is the same icon from the Modernity-GTNH pack the
+                            // project already sources from; see THIRD_PARTY_NOTICES.md.
+                            GTNACORE.id("block/multiblock/steam_elevator"))
+                    .tooltips(
+                            Component.translatable("gtna.tooltip.steam_elevator.desc")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.tooltip.steam_elevator.modules")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.tooltip.steam_elevator.teleport")
+                                    .withStyle(ChatFormatting.AQUA),
+                            Component.translatable("gtna.tooltip.steam_elevator.structure")
+                                    .withStyle(ChatFormatting.DARK_GRAY))
+                    .register());
+
+    /** Structure decoded from GTNL's steam_elevator.mbs (35x43x35); H is the hatch shell and I the module slots. */
+    private static BlockPattern createSteamElevatorPattern(MultiblockMachineDefinition definition) {
+        return GTNAMultiBlockFileReader.start(definition, "steam_elevator")
+                .where('~', controller(blocks(definition.get())))
+                // The elevator itself needs no steam (only the modules do), and the module slots sit
+                // inside the host volume: a module's own steam/item/fluid hatch lands on one of these
+                // shell cells. Pinning any of those abilities with setMaxGlobalLimited would count
+                // every module's hatch as the host's and fail the whole tower with "Maximum: 1"
+                // (the reported "only one module can have a steam hatch" bug), so the host accepts
+                // them unlimited; the module pattern is what limits each module to one hatch.
+                .where('A', blocks(GTNABlocks.STEEL_REINFORCED_WOOD.get())
+                        .or(abilities(PartAbility.STEAM))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS)))
+                .where('B', blocks(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get()))
+                .where('C', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
+                .where('D', blocks(GTBlocks.CASING_STEEL_SOLID.get()))
+                .where('E', blocks(GTBlocks.FIREBOX_STEEL.get()))
+                .where('F', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Steel)))
+                .where('G', blocks(Blocks.BRICKS))
+                .where('H', blocks(GTBlocks.CASING_STEEL_SOLID.get())
+                        .or(abilities(PartAbility.STEAM))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS))
+                        .or(abilities(PartAbility.IMPORT_ITEMS))
+                        .or(abilities(PartAbility.EXPORT_ITEMS))
+                        .or(abilities(PartAbility.IMPORT_FLUIDS))
+                        .or(abilities(PartAbility.EXPORT_FLUIDS))
+                        .or(abilities(PartAbility.MAINTENANCE)))
+                .where('I', any())
+                .where('J', blocks(Blocks.STONE_BRICKS))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's large_steam_bending (5x4x5). */
+    private static BlockPattern createLargeSteamBendingPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("CDDDC", "C   C", "CDDDC", "C   C")
+                .aisle("CDDDC", "CDDDC", "ABBBA", "CDDDC")
+                .aisle("CDDDC", "     ", "CDDDC", "     ")
+                .aisle("CDDDC", "     ", "C   C", "     ")
+                .aisle("CDDDC", "C ~ C", "C   C", "     ")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', SteamMultiMachineBase.gearboxCasing())
+                .where('B', SteamMultiMachineBase.pipeCasing())
+                .where('C', SteamMultiMachineBase.frameCasing())
+                .where('D', SteamMultiMachineBase.machineCasing()
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2))
+                        .or(abilities(IMPORT_FLUIDS).setMaxGlobalLimited(1)))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's large_steam_extruder (5x8x5). */
+    private static BlockPattern createLargeSteamExtruderPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("AAAAA", "AGGGA", "AGGGA", "AGGGA", "AAAAA", "DDDDD", "     ", "     ")
+                .aisle("AEEEA", "GFFFG", "GFFFG", "GFFFG", "ACCCA", "D   D", "     ", " AAA ")
+                .aisle("AEEEA", "GFFFG", "GFCFG", "GFCFG", "ACBCA", "A B A", "A B A", "AABAA")
+                .aisle("AEEEA", "GFFFG", "GFFFG", "GFFFG", "ACCCA", "D   D", "     ", " AAA ")
+                .aisle("AA~AA", "AGGGA", "AGGGA", "AGGGA", "AAAAA", "DDDDD", "     ", "     ")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', SteamMultiMachineBase.machineCasing()
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2)))
+                .where('B', SteamMultiMachineBase.gearboxCasing())
+                .where('C', SteamMultiMachineBase.pipeCasing())
+                .where('D', SteamMultiMachineBase.frameCasing())
+                .where('E', SteamMultiMachineBase.machineCasing())
+                .where('F', blocks(Blocks.IRON_BLOCK))
+                .where('G', blocks(Blocks.GLASS))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's large_steam_sifter (5x7x5). */
+    private static BlockPattern createLargeSteamSifterPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle(" AAA ", " ADA ", " ADA ", " A A ", " A A ", " A A ", " CCC ")
+                .aisle("AAAAA", "ADBDA", "ADDDA", "ADEDA", "ADEDA", "ADEDA", "C D C")
+                .aisle("AAAAA", "DBBBD", "DDBDD", " EBE ", " EBE ", " EBE ", "CDDDC")
+                .aisle("AAAAA", "ADBDA", "ADDDA", "ADEDA", "ADEDA", "ADEDA", "C D C")
+                .aisle(" AAA ", " A~A ", " ADA ", " A A ", " A A ", " A A ", " CCC ")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', SteamMultiMachineBase.machineCasing()
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2)))
+                .where('B', SteamMultiMachineBase.gearboxCasing())
+                .where('C', SteamMultiMachineBase.frameCasing())
+                .where('D', SteamMultiMachineBase.machineCasing())
+                .where('E', blocks(Blocks.GLASS))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's large_steam_wiremill (6x5x5). */
+    private static BlockPattern createLargeSteamWiremillPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("AAAAAC", "AAAC C", " A C C", "   C C", "   C C")
+                .aisle("AAAAA ", "DBA   ", "AAAAAA", "   ABA", "   AAA")
+                .aisle("AAAAA ", "DBA   ", "AAAAAA", "   ABA", "   AAA")
+                .aisle("AAAAA ", "DBA   ", "AAAAAA", "   ABA", "   AAA")
+                .aisle("AAAAAC", "A~AC C", " A C C", "   C C", "   C C")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', SteamMultiMachineBase.machineCasing()
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2)))
+                .where('B', SteamMultiMachineBase.pipeCasing())
+                .where('C', SteamMultiMachineBase.frameCasing())
+                .where('D', blocks(Blocks.GLASS))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's steam_item_vault (7x11x7). */
+    private static BlockPattern createSteamItemVaultPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("       ", "CCCCCCC", "CCCCCCC", "DDDDDDD", "DDDDDDD", "DDDDDDD", "DDDDDDD", "DDDDDDD",
+                        "CCCCCCC", "CCCCCCC", "BBBBBBB")
+                .aisle(" CCCCC ", "CCCCCCC", "CCCCCCC", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD",
+                        "CCCCCCC", "CCCCCCC", "B     B")
+                .aisle(" CCCCC ", "CCCCCCC", "CCCCCCC", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD",
+                        "CCCCCCC", "CCCCCCC", "B     B")
+                .aisle(" CCCCC ", "CCCCCCC", "CCCCCCC", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD",
+                        "CCCCCCC", "CCCCCCC", "B     B")
+                .aisle(" CCCCC ", "CCCCCCC", "CCCCCCC", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD",
+                        "CCCCCCC", "CCCCCCC", "B     B")
+                .aisle(" CCCCC ", "CCCCCCC", "CCCCCCC", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD", "DAAAAAD",
+                        "CCCCCCC", "CCCCCCC", "B     B")
+                .aisle("       ", "CCCCCCC", "CCC~CCC", "DDDDDDD", "DDDDDDD", "DDDDDDD", "DDDDDDD", "DDDDDDD",
+                        "CCCCCCC", "CCCCCCC", "BBBBBBB")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', blocks(GTNABlocks.HYPER_PRESSURE_BREEL_CASING.get()))
+                .where('B', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Steel)))
+                .where('C', blocks(GTNABlocks.VIBRATION_SAFE_CASING.get())
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2)))
+                .where('D', blocks(Blocks.GLASS))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's steam_lava_marker (3x5x3). */
+    private static BlockPattern createSteamLavaMakerPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("AAA", "ABA", "ABA", "ABA", "AAA")
+                .aisle("AAA", "BCB", "BCB", "BCB", "AAA")
+                .aisle("A~A", "ABA", "ABA", "ABA", "AAA")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', blocks(GTNABlocks.STRONZE_WRAPPED_CASING.get())
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(1)))
+                .where('B', blocks(Blocks.GLASS))
+                .where('C', blocks(Blocks.LAVA))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's steam_cactus_wonder (9x11x9). */
+    private static BlockPattern createSteamCactusWonderPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("  CCCCC  ", "         ", "         ", "         ", "         ", " DDD DDD ", "         ",
+                        "         ", "         ", "         ", "         ")
+                .aisle(" CFCCCFC ", "  E   E  ", "  E   E  ", "  E   E  ", "  E   E  ", "DDFDDDFDD", "  E   E  ",
+                        "  E   E  ", "  E   E  ", "  E   E  ", "         ")
+                .aisle("CFCCCCCFC", " E CCC E ", " E AAA E ", " E AAA E ", " E AAA E ", "DFDCCCDFD", " E CCC E ",
+                        " E AAA E ", " E AAA E ", " E AAA E ", "   CCC   ")
+                .aisle("CCCCCCCCC", "  CCCCC  ", "  A   A  ", "  ABBBA  ", "  A   A  ", "DDC   CDD", "  C   C  ",
+                        "  A   A  ", "  ABBBA  ", "  A   A  ", "  CCCCC  ")
+                .aisle("CCCCCCCCC", "  CCCCC  ", "  A   A  ", "  ABBBA  ", "  A   A  ", " DC   CD ", "  C   C  ",
+                        "  A   A  ", "  ABBBA  ", "  A   A  ", "  CCCCC  ")
+                .aisle("CCCCCCCCC", "  CCCCC  ", "  A   A  ", "  ABBBA  ", "  A   A  ", "DDC   CDD", "  C   C  ",
+                        "  A   A  ", "  ABBBA  ", "  A   A  ", "  CCCCC  ")
+                .aisle("CFCCCCCFC", " E CCC E ", " E A~A E ", " E AAA E ", " E AAA E ", "DFDCCCDFD", " E CCC E ",
+                        " E AAA E ", " E AAA E ", " E AAA E ", "   CCC   ")
+                .aisle(" CFCCCFC ", "  E   E  ", "  E   E  ", "  E   E  ", "  E   E  ", "DDFDDDFDD", "  E   E  ",
+                        "  E   E  ", "  E   E  ", "  E   E  ", "         ")
+                .aisle("  CCCCC  ", "         ", "         ", "         ", "         ", " DDD DDD ", "         ",
+                        "         ", "         ", "         ", "         ")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', blocks(Blocks.GLASS))
+                .where('B', SteamMultiMachineBase.pipeCasing())
+                .where('C', SteamMultiMachineBase.fireboxCasing()
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.EXPORT_FLUIDS).setMaxGlobalLimited(1)))
+                .where('D', SteamMultiMachineBase.frameCasing())
+                .where('E', blocks(Blocks.CACTUS))
+                .where('F', blocks(Blocks.SAND))
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's steam_mega_compressor (35x33x35). */
+    private static BlockPattern createMegaSteamCompressorPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BBBBBBB              ",
+                        "              BBBBBBB              ", "              BBBBBBB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BBCCCBB              ",
+                        "              BCCCCCB              ", "              CCCCCCC              ",
+                        "              CCCCCCC              ", "              CCCCCCC              ",
+                        "              BCCCCCB              ", "              BBCCCBB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "                                   ",
+                        "                                   ", "                BBB                ",
+                        "               B   B               ", "              B ACA B              ",
+                        "              B CCC B              ", "              B ACA B              ",
+                        "               B   B               ", "                BBB                ",
+                        "                                   ", "                                   ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                ACA                ",
+                        "                CCC                ", "                ACA                ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                 A                 ",
+                        "                ACA                ", "                 A                 ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "              BBCCCBB              ", "              BBCCCBB              ",
+                        "              BBCCCBB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                 A                 ",
+                        "                ACA                ", "                 A                 ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BBCCCBB              ", "              BBCCCBB              ",
+                        "              BBCCCBB              ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "              BB   BB              ",
+                        "            CCBBBBBBBCC            ", "            CCBBBBBBBCC            ",
+                        "            CCBBBBBBBCC            ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                 C                 ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "            CCBBBBBBBCC            ", "            CCBBBBBBBCC            ",
+                        "            CCBBBBBBBCC            ", "              BB   BB              ",
+                        "                                   ")
+                .aisle("                                   ", "              BB   BB              ",
+                        "           CBBBBBBBBBBBC           ", "           CBBBBBBBBBBBC           ",
+                        "           CBBBBBBBBBBBC           ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                 C                 ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "           CBBBBBBBBBBBC           ", "           CBBBBBBBBBBBC           ",
+                        "           CBBBBBBBBBBBC           ", "              BB   BB              ",
+                        "                                   ")
+                .aisle("              BB   BB              ", "             BBB   BBB             ",
+                        "          CBBBBBBBBBBBBBC          ", "          CBBBBBBBBBBBBBC          ",
+                        "          CBBBBBBBBBBBBBC          ", "          CC           CC          ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "          CC           CC          ",
+                        "          CBBBBBBBBBBBBBC          ", "          CBBBBBBBBBBBBBC          ",
+                        "          CBBBBBBBBBBBBBC          ", "             BBB   BBB             ",
+                        "              BB   BB              ")
+                .aisle("              BB   BB              ", "             BBB   BBB             ",
+                        "         CBBBBBBBBBBBBBBBC         ", "         CBBBBBBBBBBBBBBBC         ",
+                        "         CBBBBBBBBBBBBBBBC         ", "         CCCC  BBBBB  CCCC         ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "         CCCC  BBBBB  CCCC         ",
+                        "         CBBBBBBBBBBBBBBBC         ", "         CBBBBBBBBBBBBBBBC         ",
+                        "         CBBBBBBBBBBBBBBBC         ", "             BBB   BBB             ",
+                        "              BB   BB              ")
+                .aisle("              BB   BB              ", "            BBBB   BBBB            ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "        CBBBBBBBBBBBBBBBBBC        ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "         CCCCBB     BBCCCC         ",
+                        "           CCC BBBBB CCC           ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "           CCC BBBBB CCC           ", "         CCCCBB     BBCCCC         ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "        CBBBBBBBBBBBBBBBBBC        ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "            BBBB   BBBB            ",
+                        "              BB   BB              ")
+                .aisle("             BBB   BBB             ", "           BBBBB   BBBBB           ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "       CBBBBBBBCCCCCBBBBBBBC       ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "          CCB         BCC          ",
+                        "           CCBB     BBCC           ", "            CCCBBBBBCCC            ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "            CCCBBBBBCCC            ",
+                        "           CCBB     BBCC           ", "          CCB         BCC          ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "       CBBBBBBBCCCCCBBBBBBBC       ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "           BBBBB   BBBBB           ",
+                        "             BBB   BBB             ")
+                .aisle("            BBB     BBB            ", "         BBBBBB     BBBBBB         ",
+                        "       CBBBBBBC     CBBBBBBC       ", "       CBBBBBBCBBBBBCBBBBBBC       ",
+                        "       CBBBBBBC     CBBBBBBC       ", "           B           B           ",
+                        "           CB         BC           ", "            CCB     BCC            ",
+                        "             CCBBBBBCC             ", "              CBBBBBC              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              CBBBBBC              ",
+                        "             CCBBBBBCC             ", "            CCB     BCC            ",
+                        "           CB         BC           ", "           B           B           ",
+                        "       CBBBBBBC     CBBBBBBC       ", "       CBBBBBBCBBBBBCBBBBBBC       ",
+                        "       CBBBBBBC     CBBBBBBC       ", "         BBBBBB     BBBBBB         ",
+                        "            BBB     BBB            ")
+                .aisle("         BBBBB       BBBBB         ", "       BBBBBBB       BBBBBBB       ",
+                        "      BBBBBBBC       CBBBBBBB      ", "     BBBBBBBBCBBBBBBBCBBBBBBBB     ",
+                        "    BBBBBBBBBC       CBBBBBBBBB    ", "   BBB     B           B     BBB   ",
+                        "   BB       B         B       BB   ", "  BBB       CB       BC       BBB  ",
+                        "  BB         CB     BC         BB  ", "  BB         CB     BC         BB  ",
+                        " BBB          CCBBBCC          BBB ", " BB            CBBBC            BB ",
+                        " BB             CCC             BB ", " BB                             BB ",
+                        "BBB                             BBB", "BBCB                           BCBB",
+                        "BBCB                           BCBB", "BBCB                           BCBB",
+                        "BBB                             BBB", " BB                             BB ",
+                        " BB             CCC             BB ", " BB            CBBBC            BB ",
+                        " BBB          CCBBBCC          BBB ", "  BB         CB     BC         BB  ",
+                        "  BB         CB     BC         BB  ", "  BBB       CB       BC       BBB  ",
+                        "   BB       B         B       BB   ", "   BBB     B           B     BBB   ",
+                        "    BBBBBBBBBC       CBBBBBBBBB    ", "     BBBBBBBBCBBBBBBBCBBBBBBBB     ",
+                        "      BBBBBBBC       CBBBBBBB      ", "       BBBBBBB       BBBBBBB       ",
+                        "         BBBBB       BBBBB         ")
+                .aisle("         BBBB         BBBB         ", "       BBBBBB         BBBBBB       ",
+                        "      BBBBBBC   CCC   CBBBBBB      ", "     BBBBBBBCBBBBBBBBBCBBBBBBB     ",
+                        "    BBBBBBBBC         CBBBBBBBB    ", "   BBB    B             B    BBB   ",
+                        "   BB      B           B      BB   ", "  BBB       B         B       BBB  ",
+                        "  BB         B       B         BB  ", "  BB         B       B         BB  ",
+                        " BBB          CB   BC          BBB ", " BB           CB   BC           BB ",
+                        " BB            CBBBC            BB ", " BB             CCC             BB ",
+                        "BBCB                           BCBB", "BBC                             CBB",
+                        "BBC                             CBB", "BBC                             CBB",
+                        "BBCB                           BCBB", " BB             CCC             BB ",
+                        " BB            CBBBC            BB ", " BB           CB   BC           BB ",
+                        " BBB          CB   BC          BBB ", "  BB         B       B         BB  ",
+                        "  BB         B       B         BB  ", "  BBB       B         B       BBB  ",
+                        "   BB      B           B      BB   ", "   BBB    B             B    BBB   ",
+                        "    BBBBBBBBC         CBBBBBBBB    ", "     BBBBBBBCBBBBBBBBBCBBBBBBB     ",
+                        "      BBBBBBC   CCC   CBBBBBB      ", "       BBBBBB         BBBBBB       ",
+                        "         BBBB         BBBB         ")
+                .aisle("                                   ", "                                   ",
+                        "      CBBBBBC  C   C  CBBBBBC      ", "      CBBBBBCBBBBBBBBBCBBBBBC      ",
+                        "     DCBBBBBC         CBBBBBCD     ", "          B             B          ",
+                        "    D      B           B      D    ", "            B         B            ",
+                        "   D         B       B         D   ", "             B       B             ",
+                        "  D           B     B           D  ", "              B     B              ",
+                        " D            CBBBBBC            D ", "  CB           C   C           BC  ",
+                        "D C                             C D", " BCAA                         AACB ",
+                        " BCCCAA                     AACCCB ", " BCAA                         AACB ",
+                        "D C                             C D", "  CB           C   C           BC  ",
+                        " D            CBBBBBC            D ", "              B     B              ",
+                        "  D           B     B           D  ", "             B       B             ",
+                        "   D         B       B         D   ", "            B         B            ",
+                        "    D      B           B      D    ", "          B             B          ",
+                        "     DCBBBBBC         CBBBBBCD     ", "      CBBBBBCBBBBBBBBBCBBBBBC      ",
+                        "      CBBBBBC  C   C  CBBBBBC      ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "      CBBBBBC  C   C  CBBBBBC      ", "      CBBBBBCBBBBBBBBBCBBBBBC      ",
+                        "     DCBBBBBC         CBBBBBCD     ", "          B             B          ",
+                        "    D      B           B      D    ", "            B         B            ",
+                        "   D         B       B         D   ", "             B       B             ",
+                        "  D           B     B           D  ", "              B     B              ",
+                        " D            CBBBBBC            D ", "  CB           C   C           BC  ",
+                        "D C                             C D", " BCCCAA                     AACCCB ",
+                        " BCCCCCCC                 CCCCCCCB ", " BCCCAA                     AACCCB ",
+                        "D C                             C D", "  CB           C   C           BC  ",
+                        " D            CBBBBBC            D ", "              B     B              ",
+                        "  D           B     B           D  ", "             B       B             ",
+                        "   D         B       B         D   ", "            B         B            ",
+                        "    D      B           B      D    ", "          B             B          ",
+                        "     DCBBBBBC         CBBBBBCD     ", "      CBBBBBCBBBBBBBBBCBBBBBC      ",
+                        "      CBBBBBC  C   C  CBBBBBC      ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "      CBBBBBC  C   C  CBBBBBC      ", "      CBBBBBCBBBBBBBBBCBBBBBC      ",
+                        "     DCBBBBBC         CBBBBBCD     ", "          B             B          ",
+                        "    D      B           B      D    ", "            B         B            ",
+                        "   D         B       B         D   ", "             B       B             ",
+                        "  D           B     B           D  ", "              B     B              ",
+                        " D            CBBBBBC            D ", "  CB           C   C           BC  ",
+                        "D C                             C D", " BCAA                         AACB ",
+                        " BCCCAA                     AACCCB ", " BCAA                         AACB ",
+                        "D C                             C D", "  CB           C   C           BC  ",
+                        " D            CBBBBBC            D ", "              B     B              ",
+                        "  D           B     B           D  ", "             B       B             ",
+                        "   D         B       B         D   ", "            B         B            ",
+                        "    D      B           B      D    ", "          B             B          ",
+                        "     DCBBBBBC         CBBBBBCD     ", "      CBBBBBCBBBBBBBBBCBBBBBC      ",
+                        "      CBBBBBC  C   C  CBBBBBC      ", "                                   ",
+                        "                                   ")
+                .aisle("         BBBB         BBBB         ", "       BBBBBB         BBBBBB       ",
+                        "      BBBBBBC   CCC   CBBBBBB      ", "     BBBBBBBCBBBBBBBBBCBBBBBBB     ",
+                        "    BBBBBBBBC         CBBBBBBBB    ", "   BBB    B             B    BBB   ",
+                        "   BB      B           B      BB   ", "  BBB       B         B       BBB  ",
+                        "  BB         B       B         BB  ", "  BB         B       B         BB  ",
+                        " BBB          CB   BC          BBB ", " BB           CB   BC           BB ",
+                        " BB            CBBBC            BB ", " BB             CCC             BB ",
+                        "BBCB                           BCBB", "BBC                             CBB",
+                        "BBC                             CBB", "BBC                             CBB",
+                        "BBCB                           BCBB", " BB             CCC             BB ",
+                        " BB            CBBBC            BB ", " BB           CB   BC           BB ",
+                        " BBB          CB   BC          BBB ", "  BB         B       B         BB  ",
+                        "  BB         B       B         BB  ", "  BBB       B         B       BBB  ",
+                        "   BB      B           B      BB   ", "   BBB    B             B    BBB   ",
+                        "    BBBBBBBBC         CBBBBBBBB    ", "     BBBBBBBCBBBBBBBBBCBBBBBBB     ",
+                        "      BBBBBBC   CCC   CBBBBBB      ", "       BBBBBB         BBBBBB       ",
+                        "         BBBB         BBBB         ")
+                .aisle("         BBBBB       BBBBB         ", "       BBBBBBB       BBBBBBB       ",
+                        "      BBBBBBBC       CBBBBBBB      ", "     BBBBBBBBCBBBBBBBCBBBBBBBB     ",
+                        "    BBBBBBBBBC       CBBBBBBBBB    ", "   BBB     B           B     BBB   ",
+                        "   BB       B         B       BB   ", "  BBB       CB       BC       BBB  ",
+                        "  BB         CB     BC         BB  ", "  BB         CB     BC         BB  ",
+                        " BBB          CCBBBCC          BBB ", " BB            CBBBC            BB ",
+                        " BB             CCC             BB ", " BB                             BB ",
+                        "BBB                             BBB", "BBCB                           BCBB",
+                        "BBCB                           BCBB", "BBCB                           BCBB",
+                        "BBB                             BBB", " BB                             BB ",
+                        " BB             CCC             BB ", " BB            CBBBC            BB ",
+                        " BBB          CCBBBCC          BBB ", "  BB         CB     BC         BB  ",
+                        "  BB         CB     BC         BB  ", "  BBB       CB       BC       BBB  ",
+                        "   BB       B         B       BB   ", "   BBB     B           B     BBB   ",
+                        "    BBBBBBBBBC       CBBBBBBBBB    ", "     BBBBBBBBCBBBBBBBCBBBBBBBB     ",
+                        "      BBBBBBBC       CBBBBBBB      ", "       BBBBBBB       BBBBBBB       ",
+                        "         BBBBB       BBBBB         ")
+                .aisle("            BBB     BBB            ", "         BBBBBB     BBBBBB         ",
+                        "       CBBBBBBC     CBBBBBBC       ", "       CBBBBBBCBBBBBCBBBBBBC       ",
+                        "       CBBBBBBC     CBBBBBBC       ", "           B           B           ",
+                        "           CB         BC           ", "            CCB     BCC            ",
+                        "             CCBBBBBCC             ", "              CBBBBBC              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              CBBBBBC              ",
+                        "             CCBBBBBCC             ", "            CCB     BCC            ",
+                        "           CB         BC           ", "           B           B           ",
+                        "       CBBBBBBC     CBBBBBBC       ", "       CBBBBBBCBBBBBCBBBBBBC       ",
+                        "       CBBBBBBC     CBBBBBBC       ", "         BBBBBB     BBBBBB         ",
+                        "            BBB     BBB            ")
+                .aisle("             BBB   BBB             ", "           BBBBB   BBBBB           ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "       CBBBBBBBCCCCCBBBBBBBC       ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "          CCB         BCC          ",
+                        "           CCBB     BBCC           ", "            CCCBBBBBCCC            ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "            CCCBBBBBCCC            ",
+                        "           CCBB     BBCC           ", "          CCB         BCC          ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "       CBBBBBBBCCCCCBBBBBBBC       ",
+                        "       CBBBBBBBCCCCCBBBBBBBC       ", "           BBBBB   BBBBB           ",
+                        "             BBB   BBB             ")
+                .aisle("              BB   BB              ", "            BBBB   BBBB            ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "        CBBBBBBBBBBBBBBBBBC        ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "         CCCCBB     BBCCCC         ",
+                        "           CCC BBBBB CCC           ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "           CCC BBBBB CCC           ", "         CCCCBB     BBCCCC         ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "        CBBBBBBBBBBBBBBBBBC        ",
+                        "        CBBBBBBBBBBBBBBBBBC        ", "            BBBB   BBBB            ",
+                        "              BB   BB              ")
+                .aisle("              BB   BB              ", "             BBB   BBB             ",
+                        "         CBBBBBBBBBBBBBBBC         ", "         CBBBBBBBBBBBBBBBC         ",
+                        "         CBBBBBBBBBBBBBBBC         ", "         CCCC  BB~BB  CCCC         ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "         CCCC  BBBBB  CCCC         ",
+                        "         CBBBBBBBBBBBBBBBC         ", "         CBBBBBBBBBBBBBBBC         ",
+                        "         CBBBBBBBBBBBBBBBC         ", "             BBB   BBB             ",
+                        "              BB   BB              ")
+                .aisle("              BB   BB              ", "             BBB   BBB             ",
+                        "          CBBBBBBBBBBBBBC          ", "          CBBBBBBBBBBBBBC          ",
+                        "          CBBBBBBBBBBBBBC          ", "          CC           CC          ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "          CC           CC          ",
+                        "          CBBBBBBBBBBBBBC          ", "          CBBBBBBBBBBBBBC          ",
+                        "          CBBBBBBBBBBBBBC          ", "             BBB   BBB             ",
+                        "              BB   BB              ")
+                .aisle("                                   ", "              BB   BB              ",
+                        "           CBBBBBBBBBBBC           ", "           CBBBBBBBBBBBC           ",
+                        "           CBBBBBBBBBBBC           ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                 C                 ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "           CBBBBBBBBBBBC           ", "           CBBBBBBBBBBBC           ",
+                        "           CBBBBBBBBBBBC           ", "              BB   BB              ",
+                        "                                   ")
+                .aisle("                                   ", "              BB   BB              ",
+                        "            CCBBBBBBBCC            ", "            CCBBBBBBBCC            ",
+                        "            CCBBBBBBBCC            ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                 C                 ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "            CCBBBBBBBCC            ", "            CCBBBBBBBCC            ",
+                        "            CCBBBBBBBCC            ", "              BB   BB              ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "              BBCCCBB              ", "              BBCCCBB              ",
+                        "              BBCCCBB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                 A                 ",
+                        "                ACA                ", "                 A                 ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BBCCCBB              ", "              BBCCCBB              ",
+                        "              BBCCCBB              ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                 A                 ",
+                        "                ACA                ", "                 A                 ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                ACA                ",
+                        "                CCC                ", "                ACA                ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "                                   ",
+                        "                                   ", "                BBB                ",
+                        "               B   B               ", "              B ACA B              ",
+                        "              B CCC B              ", "              B ACA B              ",
+                        "               B   B               ", "                BBB                ",
+                        "                                   ", "                                   ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BBCCCBB              ",
+                        "              BCCCCCB              ", "              CCCCCCC              ",
+                        "              CCCCCCC              ", "              CCCCCCC              ",
+                        "              BCCCCCB              ", "              BBCCCBB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BBBBBBB              ",
+                        "              BBBBBBB              ", "              BBBBBBB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .aisle("                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "              BBDDDBB              ", "              BB   BB              ",
+                        "              BB   BB              ", "              BB   BB              ",
+                        "              BBDDDBB              ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ", "                                   ",
+                        "                                   ")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', blocks(Blocks.GLASS))
+                .where('B', SteamMultiMachineBase.machineCasing()
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.EXPORT_ITEMS).setMaxGlobalLimited(2))
+                        .or(abilities(PartAbility.IMPORT_FLUIDS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.EXPORT_FLUIDS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.MAINTENANCE).setExactLimit(1)))
+                .where('C', SteamMultiMachineBase.machineCasing())
+                .where('D', SteamMultiMachineBase.frameCasing())
+                .where(' ', any())
+                .build();
+    }
+
+    /** Structure decoded from GTNL's large_steam_cracking (7x4x4). */
+    private static BlockPattern createSteamCrackingPattern(MultiblockMachineDefinition definition) {
+        return FactoryBlockPattern.start()
+                .aisle("ACCACCA", "ABBABBA", "ABBABBA", "ACCACCA")
+                .aisle("ACCACCA", "A     A", "A     A", "ACCACCA")
+                .aisle("ACCACCA", "A     A", "A     A", "ACCACCA")
+                .aisle("ACCACCA", "ABB~BBA", "ABBABBA", "ACCACCA")
+                .where('~', controller(blocks(definition.get())))
+                .where('A', SteamMultiMachineBase.machineCasing()
+                        .or(abilities(PartAbility.STEAM).setExactLimit(1))
+                        .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.IMPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.EXPORT_ITEMS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.IMPORT_FLUIDS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.EXPORT_FLUIDS).setMaxGlobalLimited(1))
+                        .or(abilities(PartAbility.MAINTENANCE).setExactLimit(1)))
+                .where('B', SteamMultiMachineBase.fireboxCasing())
+                .where('C', SteamMultiMachineBase.machineCasing())
+                .where(' ', any())
+                .build();
+    }
+
     public static final MultiblockMachineDefinition LARGE_STEAM_FORMING_PRESS = registerMachine(
             "largeSteamFormingPress", () -> REGISTRATE
                     .multiblock("large_steam_forming_press",
@@ -1181,16 +2094,16 @@ public class GTNAMachines {
                             .aisle("AAAAA", "ABCBA", "AAAAA")
                             .aisle("AAAAA", " C C ", "AAAAA")
                             .aisle("AAAAA", "ABCBA", "AAAAA")
-                            .aisle(" AAA ", " A A ", " A~A ")
+                            .aisle(" A~A ", " A A ", " AAA ")
                             .where('~', controller(blocks(definition.get())))
-                            .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                            .where('A', SteamMultiMachineBase.machineCasing()
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(1)))
-                            .where('B', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
-                            .where('C', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
+                            .where('B', SteamMultiMachineBase.gearboxCasing())
+                            .where('C', SteamMultiMachineBase.pipeCasing())
                             .where(' ', any())
                             .build())
                     .workableCasingModel(
@@ -1254,7 +2167,8 @@ public class GTNAMachines {
                             .aisle("AB~BA")
                             .where('A', blocks(GTBlocks.STEEL_HULL.get())
                                     .or(abilities(IMPORT_FLUIDS).setPreviewCount(1))
-                                    .or(abilities(EXPORT_FLUIDS).setPreviewCount(1)))
+                                    .or(abilities(EXPORT_FLUIDS).setPreviewCount(1))
+                                    .or(abilities(GTNAPartAbility.STEAM_EXPORT_FLUIDS).setPreviewCount(1)))
                             .where('B', blocks(GTNABlocks.SOLAR_BOILING_CELL.get()))
                             .where('~', controller(blocks(definition.get())))
                             .build())
@@ -1317,7 +2231,8 @@ public class GTNAMachines {
                             .where('a', controller(blocks(definition.get())))
                             .where('e', blocks(GTBlocks.CASING_PRIMITIVE_BRICKS.get())
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(2))
-                                    .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(2)))
+                                    .or(abilities(IMPORT_ITEMS).setMaxGlobalLimited(2))
+                                    .or(abilities(GTNAPartAbility.THREAD_HATCH).setMaxGlobalLimited(1)))
                             .where('b', blocks(Blocks.BRICKS))
                             .where('C', blocks(Blocks.DIRT))
                             .where('d', blocks(Blocks.STONE_BRICKS))
@@ -1384,7 +2299,7 @@ public class GTNAMachines {
                     .pattern(definition -> DimensionallyTranscendentPatterns.DTPF
                             .where('a', controller(blocks(definition.get())))
                             .where('e', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1))
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setMaxGlobalLimited(1))
                                     .or(abilities(EXPORT_ITEMS).setMaxGlobalLimited(4))
@@ -1505,7 +2420,8 @@ public class GTNAMachines {
                     .where('A', blocks(GTBlocks.CASING_BRONZE_BRICKS.get())
                             .or(abilities(PartAbility.IMPORT_ITEMS).setPreviewCount(1))
                             .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                            .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
+                            .or(abilities(EXPORT_ITEMS).setPreviewCount(1))
+                            .or(abilities(PartAbility.STEAM).setExactLimit(1)))
                     .where('B', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
                     .where('C', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
                     .where('D', blocks(Blocks.IRON_BLOCK))
@@ -1568,7 +2484,7 @@ public class GTNAMachines {
                             .where('A', blocks(GTNABlocks.STRONZE_WRAPPED_CASING.get())
                                     .or(abilities(PartAbility.IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.EXPORT_FLUIDS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
                             .where('B', blocks(GTNABlocks.BOROSILICATE_GLASS_BLOCK.get()))
                             .where('C', blocks(Blocks.MAGMA_BLOCK))
                             .build())
@@ -1652,7 +2568,7 @@ public class GTNAMachines {
                             .where('C', blocks(GTNABlocks.BREEL_PLATED_CASING.get())
                                     .or(abilities(PartAbility.IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
                             .where('D', blocks(GTBlocks.CASING_STEEL_GEARBOX.get()))
                             .where('E', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Steel)))
                             .where(' ', any())
@@ -1739,7 +2655,7 @@ public class GTNAMachines {
                             .where('B', blocks(GTNABlocks.BRONZE_REINFORCED_WOOD.get())
                                     .or(abilities(PartAbility.STEAM_IMPORT_ITEMS).setPreviewCount(1))
                                     .or(abilities(PartAbility.STEAM_EXPORT_ITEMS).setPreviewCount(1))
-                                    .or(blocks(GTMachines.STEAM_HATCH.getBlock()).setExactLimit(1)))
+                                    .or(abilities(PartAbility.STEAM).setExactLimit(1)))
                             .where('C', blocks(GTNABlocks.STEEL_REINFORCED_WOOD.get()))
                             .where('D', blocks(Blocks.GLASS))
                             .where('E', blocks(Blocks.DIRT))
@@ -2537,6 +3453,7 @@ public class GTNAMachines {
                                             .setMaxGlobalLimited(1))
                                     .or(Predicates.abilities(GTNAPartAbility.ACCELERATE_HATCH)
                                             .setMaxGlobalLimited(1))
+                                    .or(Predicates.abilities(GTNAPartAbility.THREAD_HATCH).setMaxGlobalLimited(1))
                                     .or(Predicates.abilities(PartAbility.MAINTENANCE).setExactLimit(1)))
                             .where("B", Predicates.blocks(GTBlocks.CASING_TEMPERED_GLASS.get()))
                             .where("C", Predicates.blocks(GTBlocks.CASING_STEEL_GEARBOX.get()))
@@ -2562,6 +3479,212 @@ public class GTNAMachines {
                                     ChatFormatting.BOLD))
                     .register());
 
+    // ------------------------------------------------------------------
+    // Integrated Ore Processor (GTLCore port, LGPLv3) - see G-0054.
+    // Structure, casings and tooltips copied from GTLCore's
+    // MultiBlockMachineA.INTEGRATED_ORE_PROCESSOR.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition INTEGRATED_ORE_PROCESSOR = registerMachine(
+            "integratedOreProcessor", () -> REGISTRATE
+                    .multiblock("integrated_ore_processor", IntegratedOreProcessorMachine::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .allowExtendedFacing(false)
+                    .recipeType(GTNARecipeType.ORE_PROCESSING_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_STAINLESS_CLEAN)
+                    .pattern(definition -> FactoryBlockPattern.start()
+                            .aisle("aaaaaa     ", "abbbba     ", "abbbba     ", "abbbba     ", "abbbba     ",
+                                    "aaaaaa     ", "           ", "           ", "           ", "           ",
+                                    "           ", "           ")
+                            .aisle("aaaaaaaaaaa", "bd  d accca", "bd  d accca", "bd  d accca", "bd  d accca",
+                                    "aaaaaaaccca", "       ccc ", "       ccc ", "       ccc ", "       ccc ",
+                                    "       ccc ", "           ")
+                            .aisle("aaaaaaaaaaa", "b ee  c   c", "b ee  ffffc", "b ee  c   c", "b ee  ffffc",
+                                    "aaaaaac   c", "      cfffc", "      c   c", "      cfffc", "      c   c",
+                                    "      cfffc", "       gcc ")
+                            .aisle("aaaaaaaaaaa", "b ee  c   c", "b ee  ffffc", "b ee  c   c", "b ee  ffffc",
+                                    "aaaaaac   c", "      cfffc", "      c   c", "      cfffc", "      c   c",
+                                    "      cfffc", "       ccc ")
+                            .aisle("aaaaaaaaaaa", "bd  d accca", "bd  d ac~ca", "bd  d accca", "bd  d accca",
+                                    "aaaaaaaccca", "       ccc ", "       ccc ", "       ccc ", "       ccc ",
+                                    "       ccc ", "           ")
+                            .aisle("aaaaaa     ", "abbbba     ", "abbbba     ", "abbbba     ", "abbbba     ",
+                                    "aaaaaa     ", "           ", "           ", "           ", "           ",
+                                    "           ", "           ")
+                            .where("~", Predicates.controller(Predicates.blocks(definition.get())))
+                            .where("a", Predicates.blocks(GTBlocks.CASING_HSSE_STURDY.get()))
+                            .where("c", Predicates.blocks(GTBlocks.CASING_STAINLESS_CLEAN.get())
+                                    .setMinGlobalLimited(60)
+                                    .or(Predicates.abilities(PartAbility.PARALLEL_HATCH).setMaxGlobalLimited(1))
+                                    .or(Predicates.autoAbilities(definition.getRecipeTypes()))
+                                    .or(Predicates.abilities(PartAbility.MAINTENANCE).setExactLimit(1))
+                                    .or(Predicates.abilities(GTNAPartAbility.THREAD_HATCH).setMaxGlobalLimited(1)))
+                            .where("b", Predicates.blocks(GTBlocks.CASING_LAMINATED_GLASS.get()))
+                            .where("d", Predicates.blocks(
+                                    ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.BlueSteel)))
+                            .where("e", Predicates.blocks(GTBlocks.CASING_TUNGSTENSTEEL_GEARBOX.get()))
+                            .where("f", Predicates.blocks(GTBlocks.CASING_TUNGSTENSTEEL_PIPE.get()))
+                            .where("g", Predicates.blocks(GTMachines.MUFFLER_HATCH[GTValues.ZPM].getBlock()))
+                            .where(" ", Predicates.any())
+                            .build())
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_clean_stainless_steel"),
+                            GTCEu.id("block/multiblock/gcym/large_maceration_tower"))
+                    .tooltips(
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.0"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.1"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.2"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.3"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.4"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.5"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.6"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.7"),
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.8"),
+                            Component.translatable("gtceu.multiblock.parallelizable.tooltip"),
+                            Component.translatable("gtceu.machine.available_recipe_map_1.tooltip",
+                                    Component.translatable("gtna.ore_processing")))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Advanced Integrated Ore Processor (GTLCore/TST port, LGPLv3) - see G-0054.
+    // Structure copied from GTLCore's MultiBlockMachineA.ADVANCED_INTEGRATED_ORE_PROCESSOR.
+    // The KubeJS "restraint_device" and the GTL "HSSS reinforced borosilicate glass" are replaced by
+    // the equivalent GTNA blocks (GTNABlocks.RESTRAINT_DEVICE / BOROSILICATE_GLASS_BLOCK), so the port
+    // carries no unrelated mod dependency.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition ADVANCED_INTEGRATED_ORE_PROCESSOR = registerMachine(
+            "advancedIntegratedOreProcessor", () -> REGISTRATE
+                    .multiblock("advanced_integrated_ore_processor", AdvancedIntegratedOreProcessorMachine::new)
+                    .rotationState(RotationState.ALL)
+                    .recipeType(GTNARecipeType.ORE_PROCESSING_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_TUNGSTENSTEEL_ROBUST)
+                    .pattern(definition -> FactoryBlockPattern.start()
+                            .aisle("    AAAAAAAAAA ", "    AAAGGGGAAA ", "    AAAGHHGAAA ", "    AAAGHHGAAA ",
+                                    "    AAAGHHGAAA ", "    AAAGHHGAAA ", "    AAAGHHGAAA ", "    AAAGHHGAAA ",
+                                    "    AAAGHHGAAA ", "   AAAAGHHGAAAA", "     AAGHHGAA  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("   AAAAAAAAAAAA", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "    A        A ", "    A        A ", "    A        A ",
+                                    "    A        A ", "   AAA      AAA", "     A      A  ", "      AGGGGA   ")
+                            .aisle("IIIAAAAAAAAAAAA", "IIIBADEE  EEDAB", "IIIBADEE  EEDAB", "IIIBADEE  EEDAB",
+                                    "IIIBADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("IIIAAAAAAAAAAAA", "IDIBADEE  EEDAB", "IDIBADEE  EEDAB", "IDIBADEE  EEDAB",
+                                    "IIIBADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB", "   BADEE  EEDAB",
+                                    "   BADEE  EEDAB", "   AAAFF  FFAAA", "     AFF  FFA  ", "      AGCCGA   ")
+                            .aisle("III AAAAAAAAAA ", "III AAAGGGGAAA ", "I~I AAAGHHGAAA ", "III AAAGHHGAAA ",
+                                    "III AAAGHHGAAA ", "    AAAGHHGAAA ", "    AAAGHHGAAA ", "    AAAGHHGAAA ",
+                                    "    AAAGHHGAAA ", "   AAAAGHHGAAAA", "     AAGHHGAA  ", "      AGGGGA   ")
+                            .where("~", Predicates.controller(Predicates.blocks(definition.get())))
+                            .where("A", Predicates.blocks(GTBlocks.CASING_TUNGSTENSTEEL_ROBUST.get()))
+                            .where("B", Predicates.blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.HSSS)))
+                            .where("C", Predicates.blocks(GTNABlocks.RESTRAINT_DEVICE.get()))
+                            .where("D", Predicates.blocks(GTBlocks.CASING_TUNGSTENSTEEL_PIPE.get()))
+                            .where("E", Predicates.blocks(GTBlocks.CASING_TUNGSTENSTEEL_GEARBOX.get()))
+                            .where("F", Predicates.blocks(GTBlocks.CASING_GRATE.get()))
+                            .where("G", Predicates.blocks(GTBlocks.CASING_HSSE_STURDY.get()))
+                            .where("H", Predicates.blocks(GTNABlocks.BOROSILICATE_GLASS_BLOCK.get()))
+                            .where("I", Predicates.blocks(GTBlocks.CASING_TUNGSTENSTEEL_ROBUST.get())
+                                    .or(Predicates.abilities(PartAbility.INPUT_LASER))
+                                    .or(Predicates.abilities(PartAbility.IMPORT_ITEMS))
+                                    .or(Predicates.abilities(PartAbility.EXPORT_ITEMS))
+                                    .or(Predicates.abilities(PartAbility.IMPORT_FLUIDS))
+                                    .or(Predicates.abilities(GTNAPartAbility.THREAD_HATCH).setMaxGlobalLimited(1))
+                                    .or(Predicates.abilities(GTNAPartAbility.OVERCLOCK_HATCH).setMaxGlobalLimited(1))
+                                    .or(Predicates.abilities(GTNAPartAbility.ACCELERATE_HATCH).setMaxGlobalLimited(1)))
+                            .where(" ", Predicates.any())
+                            .build())
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_robust_tungstensteel"),
+                            GTCEu.id("block/multiblock/gcym/large_maceration_tower"))
+                    .tooltips(
+                            Component.translatable("gtna.machine.integrated_ore_processor.tooltip.0"),
+                            Component.translatable("gtna.machine.advanced_integrated_ore_processor.tooltip.0"),
+                            Component.translatable("gtna.machine.advanced_integrated_ore_processor.laser"),
+                            Component.translatable("gtna.machine.advanced_integrated_ore_processor.multiple_recipes"),
+                            Component.translatable("gtceu.machine.available_recipe_map_1.tooltip",
+                                    Component.translatable("gtna.ore_processing")))
+                    .register());
+
     public static final MultiblockMachineDefinition ARTIFICIAL_STAR = registerMachine("artificialStar", () -> REGISTRATE
             .multiblock("annihilate_generator", ArtificialStarMachine::new)
             .langValue("Artificial Star")
@@ -2572,8 +3695,7 @@ public class GTNAMachines {
                     Component.translatable("gtna.machine.artificial_star.output"),
                     Component.translatable("gtceu.machine.available_recipe_map_1.tooltip",
                             Component.translatable("gtceu.annihilate_generator")),
-                    Component.literal("Artificial Star"))
-            .tooltipBuilder(GTNA_ADD)
+                    Component.translatable("block.gtna.annihilate_generator"))
             .generator(true)
             .recipeModifier(ArtificialStarMachine::recipeModifier)
             .appearanceBlock(GTBlocks.HIGH_POWER_CASING)
@@ -2600,7 +3722,6 @@ public class GTNAMachines {
                     Component.translatable("gtna.machine.eye_of_harmony.tooltip.7"),
                     Component.translatable("gtceu.machine.available_recipe_map_1.tooltip",
                             Component.translatable("gtna.cosmos_simulation")))
-            .tooltipBuilder(GTNA_ADD)
             .recipeModifier(EyeOfHarmonyMachine::recipeModifier)
             .appearanceBlock(GTBlocks.HIGH_POWER_CASING)
             .pattern(GTNAMachines::createEyeOfHarmonyPattern)
@@ -2631,7 +3752,6 @@ public class GTNAMachines {
                     Component.translatable("gtna.machine.eye_of_wood.tooltip.5").withStyle(ChatFormatting.BLUE),
                     Component.translatable("gtna.machine.eye_of_wood.tooltip.6").withStyle(ChatFormatting.RED),
                     Component.translatable("gtna.machine.eye_of_wood.tooltip.7").withStyle(ChatFormatting.DARK_GRAY))
-            .tooltipBuilder(GTNA_ADD)
             .register());
 
     public static final MultiblockMachineDefinition NEXUS_MOLECULAR_FORGE = registerMachine("nexusMolecularForge",
@@ -2659,7 +3779,6 @@ public class GTNAMachines {
                                     .withStyle(ChatFormatting.GOLD),
                             Component.translatable("gtna.machine.nexus_molecular_forge.tooltip.5")
                                     .withStyle(ChatFormatting.GRAY))
-                    .tooltipBuilder(GTNA_ADD)
                     .register());
 
     public static final MultiblockMachineDefinition NEXUS_ME_HYPERCORE = registerMachine("nexusMeHypercore",
@@ -2675,16 +3794,9 @@ public class GTNAMachines {
                             GTCEu.id("block/casings/gcym/nonconducting_casing"),
                             GTCEu.id("block/multiblock/assembly_line"))
                     .tooltips(
-                            Component.literal(
-                                    "Original ME Super Computer Core structure, renamed as the Nexus ME Hypercore.")
-                                    .withStyle(ChatFormatting.AQUA),
-                            Component.literal(
-                                    "Uses the GTOCore ME CPU frame with Matrix Crafting Modules inside.")
-                                    .withStyle(ChatFormatting.GRAY),
-                            Component.literal(
-                                    "Accepts the AE2 Crafting Unit fallback where the original structure allows it.")
-                                    .withStyle(ChatFormatting.GRAY))
-                    .tooltipBuilder(GTNA_ADD)
+                            Component.translatable("gtna.machine.nexus_me_hypercore.tooltip.0"),
+                            Component.translatable("gtna.machine.nexus_me_hypercore.tooltip.1"),
+                            Component.translatable("gtna.machine.nexus_me_hypercore.tooltip.2"))
                     .register());
 
     public static final MultiblockMachineDefinition ME_STORAGE = registerMachine("meStorage",
@@ -2700,14 +3812,9 @@ public class GTNAMachines {
                             GTCEu.id("block/casings/hpca/computer_casing/back"),
                             GTCEu.id("block/multiblock/fusion_reactor"))
                     .tooltips(
-                            Component.literal("Expandable GTO-style ME storage multiblock.")
-                                    .withStyle(ChatFormatting.AQUA),
-                            Component.literal("Repeat the core slice to install up to 128 storage sections.")
-                                    .withStyle(ChatFormatting.GRAY),
-                            Component.literal(
-                                    "Requires exactly one ME Storage Access, Big Storage Access, or IO Port Hatch.")
-                                    .withStyle(ChatFormatting.GRAY))
-                    .tooltipBuilder(GTNA_ADD)
+                            Component.translatable("gtna.machine.me_storage.tooltip.0"),
+                            Component.translatable("gtna.machine.me_storage.tooltip.1"),
+                            Component.translatable("gtna.machine.me_storage.tooltip.2"))
                     .register());
 
     private static BlockPattern createArtificialStarPattern(MultiblockMachineDefinition definition) {
@@ -2824,31 +3931,26 @@ public class GTNAMachines {
     }
 
     private static BlockPattern createNexusMEHyperCorePattern(MultiblockMachineDefinition definition) {
-        var bPredicate = blocks(GCYMBlocks.CASING_NONCONDUCTING.get())
-                .or(abilities(PARALLEL_HATCH).setMaxGlobalLimited(1))
-                .or(blocks(GTNAMachines2.CRAFTING_CPU_INTERFACE.getBlock()).setExactLimit(1));
-
-        return GTNAMultiBlockFileReader.start(definition, "me_cpu")
-                .where('A', blocks(GTNABlocks.HIGH_STRENGTH_CONCRETE.get()))
-                .where('B', bPredicate)
-                .where('C', blocks(GCYMBlocks.MOLYBDENUM_DISILICIDE_COIL_BLOCK.get()))
-                .where('D', blocks(GCYMBlocks.CASING_NONCONDUCTING.get()))
-                .where('E', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.BlackSteel)))
-                .where('F',
-                        blocks(GTNABlocks.COBALT_OXIDE_CERAMIC_STRONG_THERMALLY_CONDUCTIVE_MECHANICAL_BLOCK.get()))
-                .where('G', blocks(GCYMBlocks.ELECTROLYTIC_CELL.get()))
-                .where('H', blocks(GTBlocks.CASING_PALLADIUM_SUBSTATION.get()))
-                .where('I', blocks(GCYMBlocks.CASING_LASER_SAFE_ENGRAVING.get()))
-                .where('J', blocks(GTNABlocks.OXIDATION_RESISTANT_HASTELLOY_N_MECHANICAL_CASING.get()))
-                .where('K', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.StainlessSteel)))
-                .where('L', blocks(GTBlocks.CASING_EXTREME_ENGINE_INTAKE.get()))
-                .where('M', blocks(GTBlocks.HIGH_POWER_CASING.get()))
-                .where('N', blockTag(Tags.Blocks.GLASS))
-                .where('O', craftingStorageCorePredicate()
-                        .or(blocks(Registries.getBlock("ae2:crafting_unit")).setMaxGlobalLimited(480)))
-                .where('P', blocks(GTBlocks.FILTER_CASING.get()))
+        return GTNAMultiBlockFileReader.start(definition, "nexus_me_hypercore")
+                .where('A', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.StainlessSteel)))
+                .where('B', any()) // two isolated export bounds markers, not machine components
+                .where('C', blocks(GTNABlocks.HIGH_STRENGTH_CONCRETE.get()))
+                .where('D', blocks(GTBlocks.CASING_PALLADIUM_SUBSTATION.get()))
+                .where('E', blocks(GTBlocks.CASING_EXTREME_ENGINE_INTAKE.get()))
+                .where('F', blocks(GCYMBlocks.CASING_NONCONDUCTING.get())
+                        .or(abilities(PARALLEL_HATCH).setMaxGlobalLimited(1)))
+                .where('G', blocks(GCYMBlocks.CASING_LASER_SAFE_ENGRAVING.get()))
+                .where('H', blocks(GTNABlocks.COBALT_OXIDE_CERAMIC_STRONG_THERMALLY_CONDUCTIVE_MECHANICAL_BLOCK.get()))
+                .where('I', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.BlackSteel)))
+                .where('J', blocks(GTBlocks.CASING_LAMINATED_GLASS.get()))
+                .where('K', blocks(GTBlocks.FILTER_CASING.get()))
+                .where('L', craftingStorageCorePredicate()
+                        .or(blocks(Registries.getBlock("ae2:crafting_unit"))))
+                .where('M', blocks(GCYMBlocks.MOLYBDENUM_DISILICIDE_COIL_BLOCK.get()))
+                .where('N', blocks(GTBlocks.HIGH_POWER_CASING.get()))
+                .where('P', blocks(GTNAMachines2.CRAFTING_CPU_INTERFACE.getBlock()))
                 .where('Q', controller(blocks(definition.get())))
-                .where(' ', any())
+                .where(' ', any()) // Open space around the lattice may contain AE2 cables.
                 .build();
     }
 
@@ -2916,6 +4018,239 @@ public class GTNAMachines {
             throw new IllegalStateException("Failed to load Artificial Star aisle " + index, exception);
         }
     }
+
+    // ------------------------------------------------------------------
+    // Universal Factory (GTLsupb port, LGPLv3) - 32 recipe types, cross-recipe threads,
+    // warmup / overload / batch. Uses GTNA's own multiple-recipes base.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition UNIVERSAL_FACTORY = registerMachine("universalFactory",
+            () -> REGISTRATE
+                    .multiblock("universal_factory", UniversalFactoryMachine::new)
+                    .rotationState(RotationState.ALL)
+                    .recipeType(GTRecipeTypes.BENDER_RECIPES)
+                    .recipeType(GTRecipeTypes.COMPRESSOR_RECIPES)
+                    .recipeType(GTRecipeTypes.FORGE_HAMMER_RECIPES)
+                    .recipeType(GTRecipeTypes.CUTTER_RECIPES)
+                    .recipeType(GTRecipeTypes.EXTRUDER_RECIPES)
+                    .recipeType(GTRecipeTypes.LATHE_RECIPES)
+                    .recipeType(GTRecipeTypes.WIREMILL_RECIPES)
+                    .recipeType(GTRecipeTypes.FORMING_PRESS_RECIPES)
+                    .recipeType(GTRecipeTypes.POLARIZER_RECIPES)
+                    .recipeType(GTRecipeTypes.LASER_ENGRAVER_RECIPES)
+                    .recipeType(GTRecipeTypes.FLUID_SOLIDFICATION_RECIPES)
+                    .recipeType(GTRecipeTypes.ASSEMBLER_RECIPES)
+                    .recipeType(GTRecipeTypes.ARC_FURNACE_RECIPES)
+                    .recipeType(GTRecipeTypes.CIRCUIT_ASSEMBLER_RECIPES)
+                    .recipeType(GTRecipeTypes.CANNER_RECIPES)
+                    .recipeType(GTRecipeTypes.CENTRIFUGE_RECIPES)
+                    .recipeType(GTRecipeTypes.THERMAL_CENTRIFUGE_RECIPES)
+                    .recipeType(GTRecipeTypes.ELECTROLYZER_RECIPES)
+                    .recipeType(GTRecipeTypes.SIFTER_RECIPES)
+                    .recipeType(GTRecipeTypes.MACERATOR_RECIPES)
+                    .recipeType(GTRecipeTypes.EXTRACTOR_RECIPES)
+                    .recipeType(GTRecipeTypes.CHEMICAL_RECIPES)
+                    .recipeType(GTRecipeTypes.MIXER_RECIPES)
+                    .recipeType(GTRecipeTypes.CHEMICAL_BATH_RECIPES)
+                    .recipeType(GTRecipeTypes.ORE_WASHER_RECIPES)
+                    .recipeType(GTRecipeTypes.LARGE_CHEMICAL_RECIPES)
+                    .recipeType(GTRecipeTypes.PACKER_RECIPES)
+                    .recipeType(GTRecipeTypes.DISTILLERY_RECIPES)
+                    .recipeType(GTRecipeTypes.AUTOCLAVE_RECIPES)
+                    .recipeType(GTRecipeTypes.FLUID_HEATER_RECIPES)
+                    .recipeType(GTRecipeTypes.BREWING_RECIPES)
+                    .recipeType(GTRecipeTypes.FERMENTING_RECIPES)
+                    .appearanceBlock(GTNABlocks.UNIVERSAL_FACTORY_CASING)
+                    .pattern(definition -> FactoryBlockPattern.start()
+                            .aisle("AAA", "AAA", "AAA")
+                            .aisle("AAA", "ABA", "AAA")
+                            .aisle("AAA", "A~A", "AAA")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', blocks(GTNABlocks.UNIVERSAL_FACTORY_CASING.get())
+                                    .or(abilities(PartAbility.IMPORT_ITEMS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.EXPORT_ITEMS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.IMPORT_FLUIDS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.EXPORT_FLUIDS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.INPUT_ENERGY).setPreviewCount(1))
+                                    .or(abilities(PartAbility.MAINTENANCE).setMinGlobalLimited(1)
+                                            .setMaxGlobalLimited(1)))
+                            .where('B', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.Steel)))
+                            .where(' ', any())
+                            .build())
+                    .workableCasingModel(
+                            GTNACORE.id("block/casings/universal_factory_casing"),
+                            GTCEu.id("block/multiblock/assembly_line"))
+                    .tooltips(
+                            Component.translatable("gtna.machine.universal_factory.tooltip.0")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.machine.universal_factory.tooltip.1")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.machine.universal_factory.tooltip.2")
+                                    .withStyle(ChatFormatting.AQUA),
+                            Component.translatable("gtna.machine.universal_factory.tooltip.3")
+                                    .withStyle(ChatFormatting.DARK_GRAY))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Primitive Stone Furnace (GTLsupb port, LGPLv3) - no-energy FURNACE_RECIPES multiblock.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition PRIMITIVE_STONE_FURNACE = registerMachine("primitiveStoneFurnace",
+            () -> REGISTRATE
+                    .multiblock("primitive_stone_furnace", PrimitiveStoneFurnaceMachine::new)
+                    .rotationState(RotationState.ALL)
+                    .recipeType(GTRecipeTypes.FURNACE_RECIPES)
+                    .appearanceBlock(() -> Blocks.STONE)
+                    .pattern(definition -> FactoryBlockPattern.start()
+                            .aisle("AAA", "AAA", "AAA")
+                            .aisle("AAA", "A A", "AAA")
+                            .aisle("AAA", "A~A", "AAA")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', blocks(Blocks.STONE)
+                                    .or(abilities(PartAbility.IMPORT_ITEMS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.EXPORT_ITEMS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.IMPORT_FLUIDS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.EXPORT_FLUIDS).setPreviewCount(1))
+                                    .or(abilities(PartAbility.INPUT_ENERGY).setPreviewCount(1))
+                                    .or(abilities(PARALLEL_HATCH).setMaxGlobalLimited(1))
+                                    .or(abilities(GTNAPartAbility.THREAD_HATCH).setMaxGlobalLimited(1))
+                                    .or(abilities(GTNAPartAbility.OVERCLOCK_HATCH).setMaxGlobalLimited(1))
+                                    .or(abilities(GTNAPartAbility.ACCELERATE_HATCH).setMaxGlobalLimited(1)))
+                            .where(' ', any())
+                            .build())
+                    .workableCasingModel(
+                            new ResourceLocation("minecraft", "block/stone"),
+                            GTCEu.id("block/multiblock/primitive_blast_furnace"))
+                    .tooltips(
+                            Component.translatable("gtna.machine.primitive_stone_furnace.tooltip.0")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.machine.primitive_stone_furnace.tooltip.1")
+                                    .withStyle(ChatFormatting.GRAY))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Brick Kiln (GTOCore port, LGPLv3) - see G-0060.
+    // Primitive no-energy multiblock that fires bricks/ceramics from compressed clay + coal.
+    // Structure decoded from GTOCore's pattern/brick_kiln.mbs (5 wide x 4 tall x 7 deep).
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition BRICK_KILN = registerMachine("brickKiln", () -> REGISTRATE
+            .multiblock("brick_kiln", BrickKilnMachine::new)
+            .rotationState(RotationState.NON_Y_AXIS)
+            .recipeType(GTNARecipeType.BRICK_FURNACE_RECIPES)
+            .appearanceBlock(GTBlocks.CASING_PRIMITIVE_BRICKS)
+            .pattern(definition -> FactoryBlockPattern.start()
+                    .aisle(" AAA ", " BBB ", " BBB ", "  B  ")
+                    .aisle("ACDCA", "BB BB", "BB BB", " BBB ")
+                    .aisle("ADDDA", "B   B", "B   B", " BBB ")
+                    .aisle("ADDDA", "B   B", "B   B", " BBB ")
+                    .aisle("ADDDA", "B   B", "B   B", " BBB ")
+                    .aisle("ACDCA", "BB BB", "BB BB", " BBB ")
+                    .aisle(" A~A ", " BBB ", " BBB ", "  B  ")
+                    .where('~', controller(blocks(definition.get())))
+                    .where('A', blocks(GTBlocks.CASING_PRIMITIVE_BRICKS.get())
+                            .or(abilities(PartAbility.IMPORT_ITEMS).setPreviewCount(1))
+                            .or(abilities(PartAbility.EXPORT_ITEMS).setPreviewCount(1))
+                            .or(abilities(PartAbility.IMPORT_FLUIDS).setPreviewCount(1)))
+                    .where('B', blocks(Blocks.BRICKS))
+                    .where('C', blocks(GTBlocks.CASING_PRIMITIVE_BRICKS.get()))
+                    .where('D', blocks(Blocks.STONE_BRICKS))
+                    .where(' ', any())
+                    .build())
+            .workableCasingModel(
+                    GTCEu.id("block/casings/solid/machine_primitive_bricks"),
+                    GTCEu.id("block/multiblock/primitive_blast_furnace"))
+            .tooltips(
+                    Component.translatable("gtna.machine.brick_kiln.tooltip.0")
+                            .withStyle(ChatFormatting.GOLD),
+                    Component.translatable("gtna.machine.brick_kiln.tooltip.1")
+                            .withStyle(ChatFormatting.GRAY))
+            .register());
+
+    // ------------------------------------------------------------------
+    // Thermal Power Pump (GTOCore port, LGPLv3) - see G-0062.
+    // Primitive no-energy multiblock that condenses steam into water at a rate set by the biome.
+    // Structure decoded from GTOCore's pattern/thermal_power_pump.mbs (3 wide x 3 tall x 8 deep).
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition THERMAL_POWER_PUMP = registerMachine("thermalPowerPump",
+            () -> REGISTRATE
+                    .multiblock("thermal_power_pump", ThermalPowerPumpMachine::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTRecipeTypes.DUMMY_RECIPES)
+                    .appearanceBlock(GTNABlocks.BRASS_REINFORCED_WOODEN_CASING)
+                    .pattern(definition -> FactoryBlockPattern.start()
+                            .aisle("FFF", "G G", "FFF")
+                            .aisle("FHF", "HHH", "FFF")
+                            .aisle("FFF", "GEG", "FFF")
+                            .aisle("DDD", "DED", "DDD")
+                            .aisle("CDC", "AEA", "CAC")
+                            .aisle("CDC", "AEA", "CAC")
+                            .aisle("CDC", "AEA", "CAC")
+                            .aisle("AAA", "A~A", "AAA")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('A', blocks(GTNABlocks.BRASS_REINFORCED_WOODEN_CASING.get())
+                                    .or(abilities(PartAbility.IMPORT_FLUIDS).setExactLimit(1))
+                                    .or(abilities(PartAbility.EXPORT_FLUIDS).setExactLimit(1))
+                                    .or(abilities(PartAbility.MAINTENANCE).setExactLimit(1)))
+                            .where('C', blocks(GTBlocks.CASING_BRONZE_BRICKS.get()))
+                            .where('D', blocks(GTNABlocks.BRASS_REINFORCED_WOODEN_CASING.get()))
+                            .where('E', blocks(GTBlocks.CASING_BRONZE_PIPE.get()))
+                            .where('F', blocks(GTNABlocks.BRONZE_REINFORCED_WOOD.get()))
+                            .where('G', blocks(ChemicalHelper.getBlock(TagPrefix.frameGt, GTMaterials.TreatedWood)))
+                            .where('H', blocks(GTBlocks.CASING_BRONZE_GEARBOX.get()))
+                            .where(' ', any())
+                            .build())
+                    .workableCasingModel(
+                            GTNACORE.id("block/casings/brass_reinforced_wooden_casing"),
+                            GTCEu.id("block/multiblock/multiblock_tank"))
+                    .tooltips(
+                            Component.translatable("gtna.machine.thermal_power_pump.tooltip.0")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.machine.thermal_power_pump.tooltip.1")
+                                    .withStyle(ChatFormatting.GRAY))
+                    .register());
+
+    // ------------------------------------------------------------------
+    // Liquefaction Furnace (GTOCore port, LGPLv3) - see G-0063.
+    // Coil multiblock that melts an item into a fluid. It carries a GTNA sub-pattern (extension)
+    // tower that adds Parallel / Accelerate hatches.
+    // ------------------------------------------------------------------
+    public static final MultiblockMachineDefinition LIQUEFACTION_FURNACE = registerMachine("liquefactionFurnace",
+            () -> REGISTRATE
+                    .multiblock("liquefaction_furnace", LiquefactionFurnaceMachine::new)
+                    .rotationState(RotationState.NON_Y_AXIS)
+                    .recipeType(GTNARecipeType.LIQUEFACTION_FURNACE_RECIPES)
+                    .appearanceBlock(GTBlocks.CASING_INVAR_HEATPROOF)
+                    .pattern(definition -> FactoryBlockPattern.start(FRONT, UP, RIGHT)
+                            .aisle("AAAAA", " BBB ", " AAA ")
+                            .aisle("AAAAA", "B B B", "ACCCA")
+                            .aisle("AAAA~", "BBEBB", "ACFCA")
+                            .aisle("AAAAA", "B B B", "ACCCA")
+                            .aisle("AAAAA", " BBB ", " AAA ")
+                            .where('~', controller(blocks(definition.get())))
+                            .where('B', Predicates.heatingCoils())
+                            .where('C', blocks(GTBlocks.CASING_STEEL_SOLID.get()))
+                            .where('E', blocks(GTBlocks.CASING_STEEL_PIPE.get()))
+                            .where('A', blocks(GTBlocks.CASING_INVAR_HEATPROOF.get())
+                                    .setMinGlobalLimited(20)
+                                    .or(abilities(PartAbility.INPUT_ENERGY).setMaxGlobalLimited(2)
+                                            .setPreviewCount(1))
+                                    .or(abilities(PartAbility.IMPORT_ITEMS).setMaxGlobalLimited(1)
+                                            .setPreviewCount(1))
+                                    .or(abilities(PartAbility.EXPORT_FLUIDS).setMaxGlobalLimited(1)
+                                            .setPreviewCount(1))
+                                    .or(abilities(PartAbility.MAINTENANCE).setExactLimit(1)))
+                            .where('F', abilities(PartAbility.MUFFLER))
+                            .where(' ', any())
+                            .build())
+                    .workableCasingModel(
+                            GTCEu.id("block/casings/solid/machine_casing_heatproof"),
+                            GTCEu.id("block/multiblock/multi_furnace"))
+                    .tooltips(
+                            Component.translatable("gtna.machine.liquefaction_furnace.tooltip.0")
+                                    .withStyle(ChatFormatting.GOLD),
+                            Component.translatable("gtna.machine.liquefaction_furnace.tooltip.1")
+                                    .withStyle(ChatFormatting.GRAY),
+                            Component.translatable("gtna.machine.liquefaction_furnace.tooltip.2")
+                                    .withStyle(ChatFormatting.AQUA))
+                    .register());
 
     private static <T extends MachineDefinition> T registerHatch(String hatchId, Supplier<T> supplier) {
         return ConfigHolder.isHatchEnabled(hatchId) ? supplier.get() : null;

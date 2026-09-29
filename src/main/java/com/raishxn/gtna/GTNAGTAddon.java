@@ -39,6 +39,8 @@ public class GTNAGTAddon implements IGTAddon {
     public void initializeAddon() {
         GTNAItems.init();
         GTNAMachines.init();
+        GTNAMachines3.init();
+        GTNAModules.init();
     }
 
     @Override
@@ -59,12 +61,21 @@ public class GTNAGTAddon implements IGTAddon {
         GTNAMaterialRecipes.register(provider);
         GTNAItemRecipes.register(provider);
         GTNAMachineRecipes.register(provider);
+        GTNAGreenhouseRecipes.register(provider);
+        GTNAComponentRecipes.register(provider);
+        GTNAAtomizationRecipes.register(provider);
+        GTNAIsaMillRecipes.register(provider);
+        GTNAFlotationDryingRecipes.register(provider);
+        GTNARocketFuelRecipes.register(provider);
+        GTNASupercriticalSteamTurbineRecipes.register(provider);
+        GTNATreeGrowthRecipes.register(provider);
         GTNAHatchesRecipes.register(provider);
         GTNABlockRecipes.register(provider);
         GTNAGeneratesRecipes.register(provider);
         GTNAWoodCutterRecipes.register(provider);
         GTNAInfernalCokeRecipes.register(provider);
         GTNAHighPressureRecipes.register(provider);
+        GTNALavaMakerRecipes.register(provider);
         GTNAPlanetaryCollisionRecipes.register(provider);
         VoidminerRecipes.register(provider);
     }

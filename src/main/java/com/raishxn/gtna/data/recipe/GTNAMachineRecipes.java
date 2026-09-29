@@ -2,10 +2,13 @@ package com.raishxn.gtna.data.recipe;
 
 import com.gregtechceu.gtceu.api.GTValues;
 import com.gregtechceu.gtceu.api.data.chemical.ChemicalHelper;
+import com.gregtechceu.gtceu.api.data.chemical.material.Material;
+import com.gregtechceu.gtceu.api.data.chemical.material.properties.PropertyKey;
 import com.gregtechceu.gtceu.api.data.tag.TagPrefix;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.recipe.ingredient.IntCircuitIngredient;
 import com.gregtechceu.gtceu.common.data.*;
+import com.gregtechceu.gtceu.common.data.machines.GCYMMachines;
 import com.gregtechceu.gtceu.common.data.machines.GTMultiMachines;
 import com.gregtechceu.gtceu.data.recipe.CustomTags;
 
@@ -16,13 +19,16 @@ import net.minecraft.data.recipes.RecipeCategory;
 import net.minecraft.data.recipes.ShapedRecipeBuilder;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.ItemTags;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
+import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.block.Blocks;
 
 import appeng.core.definitions.AEBlocks;
 import appeng.core.definitions.AEItems;
 import com.raishxn.gtna.GTNACORE;
+import com.raishxn.gtna.api.data.tag.GTNATagPrefix;
 import com.raishxn.gtna.common.data.*;
 
 import java.util.Objects;
@@ -31,6 +37,27 @@ import java.util.function.Consumer;
 public class GTNAMachineRecipes {
 
     public static void register(Consumer<FinishedRecipe> provider) {
+        rocketEngine(provider, "ev", GTValues.EV, GTMaterials.Lead, GTMaterials.Steel,
+                CustomTags.EV_CIRCUITS, GTItems.ELECTRIC_MOTOR_EV.get(), GTItems.ELECTRIC_PUMP_EV.get());
+        rocketEngine(provider, "iv", GTValues.IV, GTMaterials.Chromium, GTMaterials.TungstenSteel,
+                CustomTags.IV_CIRCUITS, GTItems.ELECTRIC_MOTOR_IV.get(), GTItems.ELECTRIC_PUMP_IV.get());
+        rocketEngine(provider, "luv", GTValues.LuV, GTMaterials.RhodiumPlatedPalladium, GTMaterials.Osmium,
+                CustomTags.LuV_CIRCUITS, GTItems.ELECTRIC_MOTOR_LuV.get(), GTItems.ELECTRIC_PUMP_LuV.get());
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.ROCKET_LARGE_TURBINE.asStack().getItem())
+                .pattern("ABA")
+                .pattern("CDC")
+                .pattern("EFE")
+                .define('A', GTItems.ELECTRIC_PISTON_EV.get())
+                .define('B', CustomTags.IV_CIRCUITS)
+                .define('C', GTItems.ELECTRIC_MOTOR_EV.get())
+                .define('D', GTNAMachines3.ROCKET_ENGINE_GENERATOR[GTValues.EV].asStack().getItem())
+                .define('E',
+                        Objects.requireNonNull(
+                                ChemicalHelper.getBlock(TagPrefix.cableGtDouble, GTMaterials.BlackSteel)))
+                .define('F', Objects.requireNonNull(ChemicalHelper.getTag(TagPrefix.plateDense, GTMaterials.Obsidian)))
+                .unlockedBy("has_ev_rocket_engine", InventoryChangeTrigger.TriggerInstance
+                        .hasItems(GTNAMachines3.ROCKET_ENGINE_GENERATOR[GTValues.EV].asStack().getItem()))
+                .save(provider, GTNACORE.id("rocket_large_turbine"));
         if (enabled(GTNAMachines.LARGE_STEAM_CRUSHER)) {
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_CRUSHER.asStack().getItem())
                     .pattern("ABA")
@@ -71,35 +98,22 @@ public class GTNAMachineRecipes {
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_REGULATOR.get()))
                     .save(provider);
         }
-        if (enabled(GTNAMachines.MEGA_PRESSURE_SOLAR_BOILER)) {
-            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.MEGA_PRESSURE_SOLAR_BOILER.asStack().getItem())
-                    .pattern("AAA")
-                    .pattern("BCB")
-                    .pattern("DED")
-                    .define('A', GTNABlocks.SOLAR_BOILING_CELL.get())
-                    .define('B', GTNAItems.HYDRAULIC_PUMP.get())
-                    .define('C', GTBlocks.CASING_STEEL_SOLID.get())
-                    .define('D', GTBlocks.CASING_BRONZE_BRICKS.get())
-                    .define('E', GTBlocks.CASING_STEEL_SOLID.get())
-                    .unlockedBy("has_solar_boiling_cell",
-                            InventoryChangeTrigger.TriggerInstance
-                                    .hasItems(GTNABlocks.SOLAR_BOILING_CELL.get().asItem()))
-                    .save(provider);
-        }
         if (enabled(GTNAMachines.LARGE_STEAM_FURNACE)) {
+            // GTNL: PrecisionSteamMechanism, Stronze pipe, bronze furnace, Breel tiny pipe.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_FURNACE.asStack().getItem())
                     .pattern("ABA")
                     .pattern("BCB")
                     .pattern("DBD")
                     .define('A', GTNAItems.PRECISION_STEAM_COMPONENT.get())
                     .define('B', ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTNAMaterials.Stronze).getItem())
-                    .define('C', GTMultiMachines.STEAM_OVEN.asStack().getItem())
+                    .define('C', GTMachines.STEAM_FURNACE.first().asStack().getItem())
                     .define('D', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
                     .unlockedBy("has_precision_steam_component",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_ALLOY_SMELTER)) {
+            // GTNL: bronze plates, bronze turbine, hydraulic conveyor, cauldron, bronze pipe, alloy smelter.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_ALLOY_SMELTER.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDE")
@@ -109,57 +123,58 @@ public class GTNAMachineRecipes {
                     .define('C', GTNAItems.HYDRAULIC_CONVEYOR.get())
                     .define('D', Items.CAULDRON)
                     .define('E', ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTMaterials.Bronze).getItem())
-                    .define('F', GTMachines.STEAM_ALLOY_SMELTER.right().asStack().getItem())
+                    .define('F', GTMachines.STEAM_ALLOY_SMELTER.first().asStack().getItem())
                     .unlockedBy("has_hydraulic_conveyor",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_CONVEYOR.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_HAMMER)) {
+            // GTNL: Breel tiny pipe, hydraulic piston, precision mechanism, steam hammer, anvil.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_HAMMER.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
-                    .pattern("EAF")
+                    .pattern("AEA")
                     .define('A', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
                     .define('B', GTNAItems.HYDRAULIC_PISTON.get())
                     .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', Blocks.ANVIL)
-                    .define('E', ChemicalHelper.get(TagPrefix.block, GTMaterials.Iron).getItem())
-                    .define('F', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('D', GTMachines.STEAM_HAMMER.first().asStack().getItem())
+                    .define('E', Blocks.ANVIL)
                     .unlockedBy("has_hydraulic_piston",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_PISTON.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_COMPRESSOR)) {
+            // GTNL: hydraulic piston, Stronze plates, precision mechanism, steam compressor.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_COMPRESSOR.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
-                    .pattern("EFE")
+                    .pattern("BBB")
                     .define('A', GTNAItems.HYDRAULIC_PISTON.get())
                     .define('B', ChemicalHelper.get(TagPrefix.plate, GTNAMaterials.Stronze).getItem())
                     .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', ChemicalHelper.get(TagPrefix.block, GTMaterials.Iron).getItem())
-                    .define('E', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .define('F', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('D', GTMachines.STEAM_COMPRESSOR.first().asStack().getItem())
                     .unlockedBy("has_precision_steam_component",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_EXTRACTOR)) {
+            // GTNL: reinforced glass, hydraulic piston, Breel tiny pipe, hydraulic pump, steam extractor.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_EXTRACTOR.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
                     .pattern("EFE")
-                    .define('A', Items.GLASS_BOTTLE)
-                    .define('B', GTNAItems.HYDRAULIC_PUMP.get())
+                    .define('A', GTBlocks.CASING_TEMPERED_GLASS.get())
+                    .define('B', GTNAItems.HYDRAULIC_PISTON.get())
                     .define('C', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
-                    .define('D', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('E', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .define('F', GTNAItems.HYDRAULIC_PISTON.get())
+                    .define('D', GTNAItems.HYDRAULIC_PUMP.get())
+                    .define('E', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('F', GTMachines.STEAM_EXTRACTOR.first().asStack().getItem())
                     .unlockedBy("has_hydraulic_pump",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_PUMP.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_ORE_WASHER)) {
+            // GTNL: steel rotor, hydraulic pump, precision mechanism, hydraulic motor, Breel pipe, ore washer.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_ORE_WASHER.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
@@ -167,81 +182,87 @@ public class GTNAMachineRecipes {
                     .define('A', ChemicalHelper.get(TagPrefix.rotor, GTMaterials.Steel).getItem())
                     .define('B', GTNAItems.HYDRAULIC_PUMP.get())
                     .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
-                    .define('E', GTNAItems.HYDRAULIC_MOTOR.get())
-                    .define('F', Items.WATER_BUCKET)
+                    .define('D', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('E', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
+                    .define('F', GTNABlocks.STEAM_ASSEMBLY_BLOCK.get())
                     .unlockedBy("has_hydraulic_motor",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_MOTOR.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_CIRCUIT_ASSEMBLER)) {
+            // GTNL: bronze double plates, precision mechanism, steam assembly casing.
             ShapedRecipeBuilder
                     .shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_CIRCUIT_ASSEMBLER.asStack().getItem())
                     .pattern("ABA")
-                    .pattern("CDC")
+                    .pattern("BCB")
                     .pattern("ABA")
-                    .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .define('B', Blocks.COMPARATOR)
-                    .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', AEBlocks.MOLECULAR_ASSEMBLER.block().asItem())
+                    .define('A', ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Bronze).getItem())
+                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('C', GTNABlocks.STEAM_ASSEMBLY_BLOCK.get())
                     .unlockedBy("has_precision_steam_component",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_MIXER)) {
+            // GTNL: reinforced glass, steel rotor, hydraulic motor, precision mechanism, mixer.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_MIXER.asStack().getItem())
                     .pattern("ABA")
-                    .pattern("CDC")
-                    .pattern("EBE")
-                    .define('A', ChemicalHelper.get(TagPrefix.rodLong, GTMaterials.Steel).getItem())
-                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('C', ChemicalHelper.get(TagPrefix.pipeHugeFluid, GTMaterials.Copper).getItem())
-                    .define('D', GTMachines.MIXER[GTValues.LV].asStack().getItem())
-                    .define('E', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .unlockedBy("has_precision_steam_component",
-                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
+                    .pattern("ACA")
+                    .pattern("DED")
+                    .define('A', GTBlocks.CASING_TEMPERED_GLASS.get())
+                    .define('B', ChemicalHelper.get(TagPrefix.rotor, GTMaterials.Steel).getItem())
+                    .define('C', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('D', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('E', GTNABlocks.STEAM_ASSEMBLY_BLOCK.get())
+                    .unlockedBy("has_hydraulic_motor",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_MOTOR.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_CENTRIFUGE)) {
+            // GTNL: precision mechanism, hydraulic motor, Breel tiny pipe, centrifuge.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_CENTRIFUGE.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
                     .pattern("ABA")
-                    .define('A', ChemicalHelper.get(TagPrefix.block, GTMaterials.Bronze).getItem())
-                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('C', ChemicalHelper.get(TagPrefix.gearSmall, GTMaterials.Iron).getItem())
-                    .define('D', GTMachines.CENTRIFUGE[GTValues.LV].asStack().getItem())
+                    .define('A', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('B', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('C', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
+                    .define('D', GTNABlocks.STEAM_ASSEMBLY_BLOCK.get())
                     .unlockedBy("has_precision_steam_component",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_THERMAL_CENTRIFUGE)) {
+            // GTNL: precision mechanism, hydraulic motor, Stronze pipe, bronze hull, Breel tiny pipe.
             ShapedRecipeBuilder
                     .shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_THERMAL_CENTRIFUGE.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
-                    .pattern("ABA")
-                    .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('C', ChemicalHelper.get(TagPrefix.rodLong, GTMaterials.Copper).getItem())
-                    .define('D', GTNAMachines.LARGE_STEAM_CENTRIFUGE.asStack().getItem())
-                    .unlockedBy("has_large_steam_centrifuge",
-                            InventoryChangeTrigger.TriggerInstance.hasItems(
-                                    GTNAMachines.LARGE_STEAM_CENTRIFUGE.asStack().getItem()))
+                    .pattern("EBE")
+                    .define('A', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('B', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('C', ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTNAMaterials.Stronze).getItem())
+                    .define('D', GTBlocks.BRONZE_HULL.get())
+                    .define('E', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
+                    .unlockedBy("has_hydraulic_motor",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_MOTOR.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_BATH)) {
+            // GTNL: hydraulic conveyor, reinforced glass, Breel tiny pipe, hydraulic pump,
+            // precision mechanism, bronze hull.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_BATH.asStack().getItem())
-                    .pattern("ABA")
-                    .pattern("CDC")
-                    .pattern("EBE")
-                    .define('A', ChemicalHelper.get(TagPrefix.foil, GTMaterials.Steel).getItem())
-                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('C', ChemicalHelper.get(TagPrefix.rotor, GTMaterials.Aluminium).getItem())
-                    .define('D', GTMachines.CHEMICAL_BATH[GTValues.LV].asStack().getItem())
-                    .define('E', ChemicalHelper.get(TagPrefix.block, GTMaterials.Bronze).getItem())
-                    .unlockedBy("has_precision_steam_component",
-                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
+                    .pattern("ABC")
+                    .pattern("DBA")
+                    .pattern("EFE")
+                    .define('A', GTNAItems.HYDRAULIC_CONVEYOR.get())
+                    .define('B', GTBlocks.CASING_TEMPERED_GLASS.get())
+                    .define('C', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
+                    .define('D', GTNAItems.HYDRAULIC_PUMP.get())
+                    .define('E', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('F', GTBlocks.BRONZE_HULL.get())
+                    .unlockedBy("has_hydraulic_conveyor",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_CONVEYOR.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.PRIMITIVE_DISTILLATION_TOWER)) {
@@ -261,49 +282,696 @@ public class GTNAMachineRecipes {
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_LATHE)) {
+            // GTNL: bronze plated bricks, precision mechanism, hydraulic pump, bronze gearbox,
+            // diamond, Breel large pipe, hydraulic piston.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_LATHE.asStack().getItem())
                     .pattern("ABA")
-                    .pattern("CDC")
-                    .pattern("EFE")
-                    .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .define('B', GTNAItems.HYDRAULIC_MOTOR.get())
-                    .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', GTMachines.LATHE[GTValues.LV].asStack().getItem())
-                    .define('E', ChemicalHelper.get(TagPrefix.rodLong, GTMaterials.Bronze).getItem())
-                    .define('F', GTBlocks.CASING_BRONZE_PIPE.get())
+                    .pattern("CDE")
+                    .pattern("BFG")
+                    .define('A', GTBlocks.CASING_BRONZE_BRICKS.get())
+                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('C', GTNAItems.HYDRAULIC_PUMP.get())
+                    .define('D', GTBlocks.CASING_BRONZE_GEARBOX.get())
+                    .define('E', Items.DIAMOND)
+                    .define('F', ChemicalHelper.get(TagPrefix.pipeLargeFluid, GTNAMaterials.Breel).getItem())
+                    .define('G', GTNAItems.HYDRAULIC_PISTON.get())
                     .unlockedBy("has_precision_steam_component",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_CUTTING)) {
+            // GTNL: Breel pipe, precision mechanism, glass, hydraulic conveyor, bronze pipe casing,
+            // diamond sawblade, hydraulic arm.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_CUTTING.asStack().getItem())
-                    .pattern("ABA")
-                    .pattern("CDC")
-                    .pattern("EFE")
-                    .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
-                    .define('B', GTNAItems.HYDRAULIC_PUMP.get())
-                    .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', GTMachines.CUTTER[GTValues.LV].asStack().getItem())
-                    .define('E', ChemicalHelper.get(TagPrefix.rodLong, GTMaterials.Bronze).getItem())
-                    .define('F', Blocks.DIAMOND_BLOCK)
+                    .pattern("ABC")
+                    .pattern("DEF")
+                    .pattern("BAG")
+                    .define('A', ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTNAMaterials.Breel).getItem())
+                    .define('B', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('C', Blocks.GLASS)
+                    .define('D', GTNAItems.HYDRAULIC_CONVEYOR.get())
+                    .define('E', GTBlocks.CASING_BRONZE_PIPE.get())
+                    .define('F', GTItems.COMPONENT_GRINDER_DIAMOND.get())
+                    .define('G', GTNAItems.HYDRAULIC_ARM.get())
                     .unlockedBy("has_precision_steam_component",
                             InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
                     .save(provider);
         }
+        if (enabled(GTNAMachines.LARGE_STEAM_BENDING)) {
+            // GTNL: hydraulic motor, piston, precision mechanism, hydraulic conveyor, bronze bricks.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_BENDING.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("EBE")
+                    .define('A', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('B', Blocks.PISTON)
+                    .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('D', GTNAItems.HYDRAULIC_CONVEYOR.get())
+                    .define('E', GTBlocks.CASING_BRONZE_BRICKS.get())
+                    .unlockedBy("has_hydraulic_motor",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_MOTOR.get()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.LARGE_STEAM_EXTRUDER)) {
+            // GTNL: bronze bricks, hydraulic motor, hydraulic piston, anvil, steam hammer,
+            // steel quintuple plate, hydraulic conveyor.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_EXTRUDER.asStack().getItem())
+                    .pattern("BCA")
+                    .pattern("DEF")
+                    .pattern("AGA")
+                    .define('A', GTBlocks.CASING_BRONZE_BRICKS.get())
+                    .define('B', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('C', GTNAItems.HYDRAULIC_PISTON.get())
+                    .define('D', Blocks.ANVIL)
+                    .define('E', GTMachines.STEAM_HAMMER.first().asStack().getItem())
+                    .define('F', ChemicalHelper.get(GTNATagPrefix.quintuplePlate, GTMaterials.Steel).getItem())
+                    .define('G', GTNAItems.HYDRAULIC_CONVEYOR.get())
+                    .unlockedBy("has_hydraulic_conveyor",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_CONVEYOR.get()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.LARGE_STEAM_WIREMILL)) {
+            // GTNL: hydraulic motor, Breel large pipe, precision mechanism, hydraulic conveyor,
+            // bronze bricks.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_WIREMILL.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("EBE")
+                    .define('A', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('B', ChemicalHelper.get(TagPrefix.pipeLargeFluid, GTNAMaterials.Breel).getItem())
+                    .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('D', GTNAItems.HYDRAULIC_CONVEYOR.get())
+                    .define('E', GTBlocks.CASING_BRONZE_BRICKS.get())
+                    .unlockedBy("has_hydraulic_motor",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_MOTOR.get()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.LARGE_STEAM_SIFTER)) {
+            // GTNL: Breel tiny pipe, item filter, hydraulic piston, bronze hull, precision mechanism.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LARGE_STEAM_SIFTER.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("EBE")
+                    .define('A', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
+                    .define('B', GTItems.ITEM_FILTER.get())
+                    .define('C', GTNAItems.HYDRAULIC_PISTON.get())
+                    .define('D', GTBlocks.BRONZE_HULL.get())
+                    .define('E', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .unlockedBy("has_hydraulic_piston",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_PISTON.get()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.STEAM_CRACKING)) {
+            // GTNL: Stronze huge pipe, hydraulic pump, precision mechanism, bronze hull.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.STEAM_CRACKING.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("ABA")
+                    .define('A', ChemicalHelper.get(TagPrefix.pipeHugeFluid, GTNAMaterials.Stronze).getItem())
+                    .define('B', GTNAItems.HYDRAULIC_PUMP.get())
+                    .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('D', GTBlocks.BRONZE_HULL.get())
+                    .unlockedBy("has_precision_steam_component",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.STEAM_CACTUS_WONDER)) {
+            // GTNL: cactus blocks, bronze plated bricks, hydraulic regulator.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.STEAM_CACTUS_WONDER.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("ACA")
+                    .pattern("ABA")
+                    .define('A', Blocks.CACTUS)
+                    .define('B', GTBlocks.CASING_BRONZE_BRICKS.get())
+                    .define('C', GTNAItems.HYDRAULIC_REGULATOR.get())
+                    .unlockedBy("has_hydraulic_regulator",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_REGULATOR.get()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.MEGA_STEAM_COMPRESSOR)) {
+            // GTNL SteamManufacturer parity: 64 steam compressor multis + 4 hydraulic pumps ->
+            // supercompressor (2400 t @ 1600 EU/t).
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_mega_compressor")
+                    .inputItems(GTNAMachines.LARGE_STEAM_COMPRESSOR.asStack().getItem(), 64)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 4)
+                    .outputItems(GTNAMachines.MEGA_STEAM_COMPRESSOR.asStack())
+                    .duration(2400)
+                    .EUt(1600)
+                    .save(provider);
+        }
+        // ------------------------------------------------------------------
+        // Steam Elevator + its eight modules (GTNL assembler recipes, mapped to GTNA items).
+        // ------------------------------------------------------------------
+        if (enabled(GTNAMachines.STEAM_ELEVATOR)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(Blocks.BRICKS, 64)
+                    .inputItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Steel).getItem(), 48)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get(), 8)
+                    .inputItems(GTNAItems.PRECISION_STEAM_COMPONENT.get(), 16)
+                    .inputFluids(GTNAMaterials.Stronze.getFluid(1296))
+                    .outputItems(GTNAMachines.STEAM_ELEVATOR.asStack())
+                    .duration(600)
+                    .EUt(30)
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_ORE_PROCESSOR_MODULE)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_ore_processor_module")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(ChemicalHelper.get(TagPrefix.dust, GTMaterials.Diamond).getItem(), 16)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 32)
+                    .inputItems(GTNAItems.HYDRAULIC_PISTON.get(), 32)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 32)
+                    .inputItems(GTNAItems.HYDRAULIC_CONVEYOR.get(), 32)
+                    .inputFluids(GTNAMaterials.Breel.getFluid(1296))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_ORE_PROCESSOR_MODULE.asStack())
+                    .duration(600)
+                    .EUt(30)
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_FLIGHT_MODULE_I)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_flight_module_i")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 1)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_RECEIVER.get(), 2)
+                    .inputItems(GTNAItems.PRECISION_STEAM_COMPONENT.get(), 2)
+                    .inputItems(Items.FEATHER, 1)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_FLIGHT_MODULE_I.asStack())
+                    .duration(400)
+                    .EUt(100)
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_flight_module_ii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_FLIGHT_MODULE_I.asStack())
+                    .inputItems(CustomTags.MV_CIRCUITS)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_RECEIVER.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 4)
+                    .inputItems(Items.FEATHER, 8)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(648))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_FLIGHT_MODULE_II.asStack())
+                    .duration(300)
+                    .EUt(GTValues.VA[GTValues.MV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_flight_module_iii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_FLIGHT_MODULE_II.asStack())
+                    .inputItems(CustomTags.HV_CIRCUITS)
+                    .inputItems(GTNAItems.HYDRAULIC_VAPOR_GENERATOR.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 8)
+                    .inputItems(Items.ELYTRA, 1)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(1296))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_FLIGHT_MODULE_III.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.HV])
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_BEACON_MODULE_I)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_beacon_module_i")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 1)
+                    .inputItems(Items.BREWING_STAND, 1)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get(), 8)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputItems(Items.GUNPOWDER, 64)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_BEACON_MODULE_I.asStack())
+                    .duration(400)
+                    .EUt(16)
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_beacon_module_ii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_BEACON_MODULE_I.asStack())
+                    .inputItems(CustomTags.LV_CIRCUITS)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_RECEIVER.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 8)
+                    .inputItems(Items.ENDER_PEARL, 16)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(648))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_BEACON_MODULE_II.asStack())
+                    .duration(300)
+                    .EUt(28)
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_beacon_module_iii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_BEACON_MODULE_II.asStack())
+                    .inputItems(IntCircuitIngredient.of(2))
+                    .inputItems(GTNAItems.HYDRAULIC_VAPOR_GENERATOR.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 8)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputItems(Items.BLAZE_POWDER, 8)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(1296))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_BEACON_MODULE_III.asStack())
+                    .duration(200)
+                    .EUt(100)
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_MONSTER_REPELLENT_MODULE_I)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_monster_repellent_module_i")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 1)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputItems(Items.TORCH, 64)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get(), 2)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 2)
+                    .inputItems(CustomTags.LV_CIRCUITS)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_MONSTER_REPELLENT_MODULE_I.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_monster_repellent_module_ii")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 2)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputItems(Items.SOUL_TORCH, 32)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get(), 2)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_RECEIVER.get(), 2)
+                    .inputItems(IntCircuitIngredient.of(2))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_MONSTER_REPELLENT_MODULE_II.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_monster_repellent_module_iii")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputItems(Items.SOUL_TORCH, 64)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get(), 2)
+                    .inputItems(GTNAItems.HYDRAULIC_VAPOR_GENERATOR.get(), 2)
+                    .inputItems(IntCircuitIngredient.of(3))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_MONSTER_REPELLENT_MODULE_III.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_WEATHER_MODULE_I)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_weather_module_i")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 1)
+                    .inputItems(Items.SNOWBALL, 64)
+                    .inputItems(Items.AMETHYST_SHARD, 2)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_STEAM_RECEIVER.get(), 4)
+                    .inputItems(CustomTags.LV_CIRCUITS)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_WEATHER_MODULE_I.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_weather_module_ii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_WEATHER_MODULE_I.asStack())
+                    .inputItems(CustomTags.MV_CIRCUITS)
+                    .inputItems(Items.SNOWBALL, 64)
+                    .inputItems(Items.AMETHYST_SHARD, 8)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 8)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(648))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_WEATHER_MODULE_II.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.MV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_weather_module_iii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_WEATHER_MODULE_II.asStack())
+                    .inputItems(CustomTags.HV_CIRCUITS)
+                    .inputItems(Items.AMETHYST_SHARD, 16)
+                    .inputItems(GTNAItems.HYDRAULIC_VAPOR_GENERATOR.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 8)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(1296))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_WEATHER_MODULE_III.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.HV])
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_ENTITY_CRUSHER_MODULE_I)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_entity_crusher_module_i")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(ChemicalHelper.get(TagPrefix.dust, GTMaterials.Diamond).getItem(), 9)
+                    .inputItems(CustomTags.LV_CIRCUITS)
+                    .inputItems(GTNAItems.HYDRAULIC_PISTON.get(), 8)
+                    .inputItems(GTNAItems.HYDRAULIC_CONVEYOR.get(), 8)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_ENTITY_CRUSHER_MODULE_I.asStack())
+                    .duration(300)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_entity_crusher_module_ii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_ENTITY_CRUSHER_MODULE_I.asStack())
+                    .inputItems(CustomTags.MV_CIRCUITS)
+                    .inputItems(ChemicalHelper.get(TagPrefix.dust, GTMaterials.Diamond).getItem(), 18)
+                    .inputItems(GTNAItems.HYDRAULIC_PISTON.get(), 16)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(648))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_ENTITY_CRUSHER_MODULE_II.asStack())
+                    .duration(300)
+                    .EUt(GTValues.VA[GTValues.MV])
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_entity_crusher_module_iii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_ENTITY_CRUSHER_MODULE_II.asStack())
+                    .inputItems(CustomTags.HV_CIRCUITS)
+                    .inputItems(GTNAItems.HYDRAULIC_VAPOR_GENERATOR.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_PISTON.get(), 16)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(1296))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_ENTITY_CRUSHER_MODULE_III.asStack())
+                    .duration(300)
+                    .EUt(GTValues.VA[GTValues.HV])
+                    .save(provider);
+        }
+        IntegratedOreRecipes.register(provider);
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_OIL_DRILL_MODULE_I)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_oil_drill_module_i")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(GTNABlocks.BREEL_PLATED_CASING.get(), 12)
+                    .inputItems(CustomTags.LV_CIRCUITS)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 8)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 12)
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 12)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_OIL_DRILL_MODULE_I.asStack())
+                    .duration(300)
+                    .EUt(28)
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_oil_drill_module_ii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_OIL_DRILL_MODULE_I.asStack())
+                    .inputItems(GTNABlocks.HYPER_PRESSURE_BREEL_CASING.get(), 12)
+                    .inputItems(IntCircuitIngredient.of(2))
+                    .inputItems(GTNAItems.HYDRAULIC_PUMP.get(), 4)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 6)
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 12)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_OIL_DRILL_MODULE_II.asStack())
+                    .duration(300)
+                    .EUt(80)
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_oil_drill_module_iii")
+                    .inputItems(GTNAMachines2.STEAM_ELEVATOR_OIL_DRILL_MODULE_II.asStack())
+                    .inputItems(GTNABlocks.HYPER_PRESSURE_BREEL_CASING.get(), 16)
+                    .inputItems(IntCircuitIngredient.of(3))
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 8)
+                    .inputItems(GTNAItems.HYDRAULIC_VAPOR_GENERATOR.get(), 3)
+                    .inputItems(ChemicalHelper.get(TagPrefix.gear, GTMaterials.StainlessSteel).getItem(), 12)
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_OIL_DRILL_MODULE_III.asStack())
+                    .duration(300)
+                    .EUt(300)
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_GREENHOUSE_MODULE)) {
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_greenhouse_module")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(Blocks.DIRT, 64)
+                    .inputItems(Items.STICK, 64)
+                    .inputItems(GTNAItems.HYDRAULIC_CONVEYOR.get(), 16)
+                    .inputItems(GTNAItems.HYDRAULIC_ARM.get(), 16)
+                    .inputFluids(GTMaterials.Water.getFluid(16000))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_GREENHOUSE_MODULE.asStack())
+                    .duration(200)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_APIARY_MODULE)) {
+            // GTNL: compact pipe casing, Forestry alvearies + honey, LV.
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_apiary_module")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(Items.HONEYCOMB, 16)
+                    .inputItems(Items.HONEY_BLOCK, 4)
+                    .inputItems(GTNAItems.HYDRAULIC_CONVEYOR.get(), 16)
+                    .inputItems(GTNAItems.HYDRAULIC_ARM.get(), 16)
+                    .inputFluids(GTMaterials.Water.getFluid(10000))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_APIARY_MODULE.asStack())
+                    .duration(300)
+                    .EUt(GTValues.VA[GTValues.LV])
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines2.STEAM_ELEVATOR_BEE_BREEDING_MODULE)) {
+            // GTNL: compact pipe casing, Forestry royal jelly/beeswax/pollen + honey, MV.
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_elevator_bee_breeding_module")
+                    .inputItems(GTNABlocks.STEAM_COMPACT_PIPE_CASING.get(), 4)
+                    .inputItems(Items.HONEYCOMB, 8)
+                    .inputItems(Items.HONEY_BOTTLE, 8)
+                    .inputItems(Items.HONEY_BLOCK, 2)
+                    .inputItems(GTNAItems.HYDRAULIC_REGULATOR.get(), 8)
+                    .inputItems(GTNAItems.HYDRAULIC_ARM.get(), 8)
+                    .inputFluids(GTMaterials.Water.getFluid(10000))
+                    .outputItems(GTNAMachines2.STEAM_ELEVATOR_BEE_BREEDING_MODULE.asStack())
+                    .duration(300)
+                    .EUt(GTValues.VA[GTValues.MV])
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.LIQUEFACTION_FURNACE)) {
+            // GTOCore GTORecyclingRecipeHandler.processCrushing: every recyclable material prefix
+            // with an item and fluid can be liquefied, except blast materials' dust.
+            for (Material material : com.gregtechceu.gtceu.api.GTCEuAPI.materialManager.getRegisteredMaterials()) {
+                for (TagPrefix prefix : TagPrefix.values()) {
+                    if (prefix.generateRecycling()) {
+                        addLiquefactionRecipe(provider, prefix, material);
+                    }
+                }
+            }
+        }
+        if (enabled(GTNAMachines.STEAM_CACTUS_WONDER)) {
+            // GTNL CactusWonderFakeRecipes: GT++ cactus charcoal/coke -> steam at one recipe per
+            // 20 ticks. GTNA has no cactus carbon items, so the closest GTNA fuels are used and the
+            // steam grade follows the GTNL tier (regular / superheated / dense supercritical).
+            GTNARecipeType.CACTUS_WONDER_RECIPES.recipeBuilder("cactus_wonder_steam_from_charcoal")
+                    .inputItems(Items.CHARCOAL)
+                    .outputFluids(GTMaterials.Steam.getFluid(64000))
+                    .duration(20)
+                    .EUt(0)
+                    .save(provider);
+            GTNARecipeType.CACTUS_WONDER_RECIPES.recipeBuilder("cactus_wonder_steam_from_coal")
+                    .inputItems(Items.COAL)
+                    .outputFluids(GTMaterials.Steam.getFluid(64000))
+                    .duration(20)
+                    .EUt(0)
+                    .save(provider);
+            GTNARecipeType.CACTUS_WONDER_RECIPES.recipeBuilder("cactus_wonder_steam_from_coal_block")
+                    .inputItems(Items.COAL_BLOCK)
+                    .outputFluids(GTMaterials.Steam.getFluid(64000))
+                    .duration(20)
+                    .EUt(0)
+                    .save(provider);
+            GTNARecipeType.CACTUS_WONDER_RECIPES.recipeBuilder("cactus_wonder_superheated_from_coke")
+                    .inputItems(ChemicalHelper.get(TagPrefix.gem, GTMaterials.Coke).getItem())
+                    .outputFluids(GTNAMaterials.SuperHeatedSteam.getFluid(128000))
+                    .duration(20)
+                    .EUt(0)
+                    .save(provider);
+            GTNARecipeType.CACTUS_WONDER_RECIPES.recipeBuilder("cactus_wonder_supercritical_from_coke_block")
+                    .inputItems(ChemicalHelper.get(TagPrefix.block, GTMaterials.Coke).getItem())
+                    .outputFluids(GTNAMaterials.DenseSupercriticalSteam.getFluid(512000))
+                    .duration(20)
+                    .EUt(0)
+                    .save(provider);
+        }
+
+        // GTOCore MachineRecipe.java: steel plates, LV circuits and an LV emitter.
+        if (enabled(GTNAMachines3.GENERATOR_ARRAY)) {
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.GENERATOR_ARRAY.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("BCB")
+                    .pattern("ABA")
+                    .define('A', Objects.requireNonNull(ChemicalHelper.getTag(TagPrefix.plate, GTMaterials.Steel)))
+                    .define('B', CustomTags.LV_CIRCUITS)
+                    .define('C', GTItems.EMITTER_LV.asStack().getItem())
+                    .unlockedBy("has_steel_plate", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.Steel).getItem()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines3.FISHING_GROUND)) {
+            // GTOCore Mixer.java, Assembler.java and classified/FishingGround.java.
+            GTRecipeTypes.MIXER_RECIPES.recipeBuilder("gtna_eglin_steel_dust")
+                    .inputItems(TagPrefix.dust, GTMaterials.Iron, 4)
+                    .inputItems(TagPrefix.dust, GTMaterials.Kanthal)
+                    .inputItems(TagPrefix.dust, GTMaterials.Invar, 5)
+                    .inputItems(TagPrefix.dust, GTMaterials.Sulfur)
+                    .inputItems(TagPrefix.dust, GTMaterials.Silicon)
+                    .inputItems(TagPrefix.dust, GTMaterials.Carbon)
+                    .outputItems(TagPrefix.dust, GTNAMaterials.EglinSteel, 13)
+                    .EUt(120)
+                    .duration(600)
+                    .save(provider);
+            GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_aluminium_bronze_casing")
+                    .inputItems(TagPrefix.frameGt, GTNAMaterials.AluminiumBronze)
+                    .inputItems(TagPrefix.plate, GTNAMaterials.AluminiumBronze, 6)
+                    .circuitMeta(6)
+                    .outputItems(GTNABlocks.ALUMINIUM_BRONZE_CASING.asItem())
+                    .EUt(16)
+                    .duration(50)
+                    .save(provider);
+            GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_fishing_ground")
+                    .inputItems(GTMachines.FISHER[GTValues.LV].asStack())
+                    .inputItems(GTMachines.FISHER[GTValues.MV].asStack())
+                    .inputItems(GTMachines.FISHER[GTValues.HV].asStack())
+                    .inputItems(GTItems.SENSOR_LV)
+                    .inputItems(GTItems.SENSOR_MV)
+                    .inputItems(GTItems.SENSOR_HV)
+                    .inputItems(CustomTags.EV_CIRCUITS, 2)
+                    .inputItems(TagPrefix.plate, GTNAMaterials.EglinSteel, 4)
+                    .inputItems(TagPrefix.plateDouble, GTNAMaterials.AluminiumBronze, 4)
+                    .inputFluids(GTMaterials.SolderingAlloy, 576)
+                    .outputItems(GTNAMachines3.FISHING_GROUND.asStack())
+                    .EUt(480)
+                    .duration(400)
+                    .save(provider);
+            Item[] fish = { Items.COD, Items.SALMON, Items.TROPICAL_FISH, Items.PUFFERFISH };
+            for (int index = 0; index < fish.length; index++) {
+                GTNARecipeType.FISHING_GROUND_RECIPES.recipeBuilder("fishing_ground" + (index + 1))
+                        .notConsumable(new net.minecraft.world.item.ItemStack(fish[index], 64))
+                        .inputItems(TagPrefix.dustTiny, GTMaterials.Meat, 64)
+                        .outputItems(fish[index], 32)
+                        .EUt(1)
+                        .duration(2000)
+                        .save(provider);
+            }
+        }
+        if (enabled(GTNAMachines3.EVAPORATION_PLANT)) {
+            // GTOCore MachineRecipe.java, MiscRecipe.java, Evaporation.java and BrineRecipes.java.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.EVAPORATION_PLANT.asStack().getItem())
+                    .pattern("CBC")
+                    .pattern("FMF")
+                    .pattern("CBC")
+                    .define('C', CustomTags.HV_CIRCUITS)
+                    .define('B', ChemicalHelper.get(TagPrefix.wireGtDouble, GTMaterials.Kanthal).getItem())
+                    .define('F', GTItems.ELECTRIC_PUMP_HV.asStack().getItem())
+                    .define('M', GTMachines.HULL[GTValues.HV].asStack().getItem())
+                    .unlockedBy("has_hv_pump", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(GTItems.ELECTRIC_PUMP_HV.asStack().getItem()))
+                    .save(provider);
+            GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("gtna_stainless_evaporation_casing")
+                    .inputItems(GTBlocks.CASING_STAINLESS_CLEAN.asItem())
+                    .inputItems(TagPrefix.wireGtDouble, GTMaterials.AnnealedCopper, 4)
+                    .inputFluids(GTMaterials.PolyvinylChloride, 288)
+                    .outputItems(GTNABlocks.STAINLESS_EVAPORATION_CASING.asItem())
+                    .duration(30)
+                    .EUt(GTValues.VA[GTValues.HV])
+                    .save(provider);
+            GTNARecipeType.EVAPORATION_RECIPES.recipeBuilder("salt_water")
+                    .inputFluids(GTMaterials.Water, 50_000)
+                    .outputFluids(GTMaterials.SaltWater.getFluid(1_000))
+                    .EUt(30)
+                    .duration(600)
+                    .save(provider);
+            GTNARecipeType.EVAPORATION_RECIPES.recipeBuilder("brine_evaporation")
+                    .inputFluids(GTMaterials.SaltWater, 20_000)
+                    .outputFluids(GTNAMaterials.RawBrine.getFluid(1_000))
+                    .duration(1_000)
+                    .EUt(GTValues.VA[GTValues.HV])
+                    .save(provider);
+            registerBrineChain(provider);
+        }
+        if (enabled(GTNAMachines3.GREENHOUSE)) {
+            // GTOCore classified/Vanilla.java:385, exact MV controller ingredients.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.GREENHOUSE.asStack().getItem())
+                    .pattern("AAA")
+                    .pattern("BCB")
+                    .pattern("DED")
+                    .define('A', GTBlocks.CASING_TEMPERED_GLASS.asItem())
+                    .define('B', CustomTags.MV_CIRCUITS)
+                    .define('C', GTMachines.HULL[GTValues.MV].asStack().getItem())
+                    .define('D', GTItems.ELECTRIC_PISTON_MV.asStack().getItem())
+                    .define('E', GTItems.ELECTRIC_PUMP_MV.asStack().getItem())
+                    .unlockedBy("has_mv_pump", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(GTItems.ELECTRIC_PUMP_MV.asStack().getItem()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines3.LARGE_GREENHOUSE)) {
+            // GTOCore classified/Vanilla.java:290; the existing Greenhouse is the center item.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.LARGE_GREENHOUSE.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("ABA")
+                    .define('A', GTItems.FIELD_GENERATOR_EV.asItem())
+                    .define('B', CustomTags.LuV_CIRCUITS)
+                    .define('C', GTItems.SENSOR_EV.asItem())
+                    .define('D', GTNAMachines3.GREENHOUSE.asStack().getItem())
+                    .unlockedBy("has_greenhouse", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(GTNAMachines3.GREENHOUSE.asStack().getItem()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines3.BLAZE_BLAST_FURNACE)) {
+            // Original casing needs the excluded Reaction Furnace. The Large Chemical Reactor
+            // accepts the same item and all three fluids at EV; its 4500 K coil gate cannot apply.
+            GTRecipeTypes.LARGE_CHEMICAL_RECIPES.recipeBuilder("blaze_casing_gtna_route")
+                    .inputItems(GCYMBlocks.CASING_HIGH_TEMPERATURE_SMELTING.asItem())
+                    .inputItems(TagPrefix.foil, GTMaterials.Tin, 32)
+                    .inputFluids(GTMaterials.Blaze, 1440)
+                    .inputFluids(GTMaterials.GalliumArsenide, 576)
+                    .inputFluids(GTMaterials.VanadiumGallium, 288)
+                    .outputItems(GTNABlocks.BLAZE_CASING.asItem())
+                    .EUt(1920).duration(900).save(provider);
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.BLAZE_BLAST_FURNACE.asStack().getItem())
+                    .pattern("ABA").pattern("BCB").pattern("ABA")
+                    .define('A', GTNABlocks.BLAZE_CASING.asItem())
+                    .define('B', GTItems.FIELD_GENERATOR_IV.asItem())
+                    .define('C', GTMultiMachines.ELECTRIC_BLAST_FURNACE.asStack().getItem())
+                    .unlockedBy("has_blaze_casing", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(GTNABlocks.BLAZE_CASING.asItem()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines3.COLD_ICE_FREEZER)) {
+            // GTOCore classified/Vacuum.java:46 and classified/Vanilla.java:609.
+            GTRecipeTypes.VACUUM_RECIPES.recipeBuilder("cold_ice_casing")
+                    .inputItems(GTBlocks.CASING_ALUMINIUM_FROSTPROOF.asItem())
+                    .inputFluids(GTMaterials.Ice, 10_000)
+                    .inputFluids(GTMaterials.VanadiumGallium, 576)
+                    .outputItems(GTNABlocks.COLD_ICE_CASING.asItem())
+                    .EUt(1920).duration(200).save(provider);
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.COLD_ICE_FREEZER.asStack().getItem())
+                    .pattern("ABA").pattern("BCB").pattern("ABA")
+                    .define('A', GTNABlocks.COLD_ICE_CASING.asItem())
+                    .define('B', GTItems.EMITTER_IV.asItem())
+                    .define('C', GTMultiMachines.VACUUM_FREEZER.asStack().getItem())
+                    .unlockedBy("has_cold_ice_casing", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(GTNABlocks.COLD_ICE_CASING.asItem()))
+                    .save(provider);
+        }
+        // Chemical Plant controller recipe intentionally omitted: GTO's original is an Assembly
+        // Line recipe that needs GTO-only WatertightSteel and other resources. Author decision
+        // (2026-09-25) is to skip fabricated controller recipes and record the gap. A full port
+        // would require porting the whole GTO material chain.
+        if (enabled(GTNAMachines3.MEGA_ALLOY_BLAST_SMELTER)) {
+            // GTOCore classified/Vanilla.java:564, all GTCEu/GCYM ingredients.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines3.MEGA_ALLOY_BLAST_SMELTER.asStack().getItem())
+                    .pattern("ABA").pattern("CDC").pattern("EFE")
+                    .define('A', ChemicalHelper.get(TagPrefix.spring, GTMaterials.NaquadahAlloy).getItem())
+                    .define('B', CustomTags.ZPM_CIRCUITS)
+                    .define('C', GTItems.FIELD_GENERATOR_ZPM.asItem())
+                    .define('D', GCYMMachines.BLAST_ALLOY_SMELTER.asStack().getItem())
+                    .define('E', ChemicalHelper.get(TagPrefix.plateDense, GTMaterials.Darmstadtium).getItem())
+                    .define('F', ChemicalHelper
+                            .get(TagPrefix.wireGtHex, GTMaterials.EnrichedNaquadahTriniumEuropiumDuranide).getItem())
+                    .unlockedBy("has_blast_alloy_smelter", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(GCYMMachines.BLAST_ALLOY_SMELTER.asStack().getItem()))
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.STEAM_LAVA_MAKER)) {
+            // GTNL SteamManufacturer parity: StronzeWrappedCasing + 2 hydraulic motors + Stronze/Breel
+            // medium pipes -> lava maker (200 t @ 200 EU/t).
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("steam_lava_maker")
+                    .inputItems(GTNABlocks.STRONZE_WRAPPED_CASING.get())
+                    .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 2)
+                    .inputItems(ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTNAMaterials.Stronze).getItem(), 2)
+                    .inputItems(ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTNAMaterials.Breel).getItem(), 2)
+                    .outputItems(GTNAMachines.STEAM_LAVA_MAKER.asStack())
+                    .duration(200)
+                    .EUt(200)
+                    .save(provider);
+        }
+        if (enabled(GTNAMachines.STEAM_ITEM_VAULT)) {
+            // GTNL assembler parity (closest GTNA items): vibration safe casing shell, hyper pressure
+            // breel core, hydraulic steam jet spewer, chest storage.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.STEAM_ITEM_VAULT.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("EFE")
+                    .define('A', GTNABlocks.VIBRATION_SAFE_CASING.get())
+                    .define('B', GTNABlocks.HYPER_PRESSURE_BREEL_CASING.get())
+                    .define('C', GTNAItems.HYDRAULIC_STEAM_JET_SPEWER.get())
+                    .define('D', Blocks.CHEST)
+                    .define('E', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('F', ChemicalHelper.get(TagPrefix.plate, GTNAMaterials.CompressedSteam).getItem())
+                    .unlockedBy("has_vibration_safe_casing",
+                            InventoryChangeTrigger.TriggerInstance
+                                    .hasItems(GTNABlocks.VIBRATION_SAFE_CASING.get()))
+                    .save(provider);
+        }
         if (enabled(GTNAMachines.LARGE_STEAM_FORMING_PRESS)) {
+            // GTNL: Breel tiny pipe, hydraulic piston, precision mechanism, bronze hull.
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                     GTNAMachines.LARGE_STEAM_FORMING_PRESS.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
-                    .pattern("EFE")
-                    .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Bronze).getItem())
+                    .pattern("ABA")
+                    .define('A', ChemicalHelper.get(TagPrefix.pipeTinyFluid, GTNAMaterials.Breel).getItem())
                     .define('B', GTNAItems.HYDRAULIC_PISTON.get())
                     .define('C', GTNAItems.PRECISION_STEAM_COMPONENT.get())
-                    .define('D', GTMachines.FORMING_PRESS[GTValues.LV].asStack().getItem())
-                    .define('E', GTBlocks.CASING_BRONZE_GEARBOX.get())
-                    .define('F', GTBlocks.CASING_BRONZE_PIPE.get())
-                    .unlockedBy("has_precision_steam_component",
-                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
+                    .define('D', GTBlocks.BRONZE_HULL.get())
+                    .unlockedBy("has_hydraulic_piston",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.HYDRAULIC_PISTON.get()))
                     .save(provider);
         }
         if (enabled(GTNAMachines.LARGE_STEAM_STORAGE_TANK)) {
@@ -403,6 +1071,19 @@ public class GTNAMachineRecipes {
         }
 
         if (enabled(GTNAMachines.STONE_SUPERHEATER)) {
+            // Crafting fallback (the GTNL machine is otherwise only made in the SteamManufacturer).
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.STONE_SUPERHEATER.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("EBE")
+                    .define('A', ChemicalHelper.get(TagPrefix.plate, GTNAMaterials.Stronze).getItem())
+                    .define('B', GTNAItems.HYDRAULIC_MOTOR.get())
+                    .define('C', ChemicalHelper.get(TagPrefix.pipeNormalFluid, GTNAMaterials.Stronze).getItem())
+                    .define('D', GTNAItems.PRECISION_STEAM_COMPONENT.get())
+                    .define('E', GTNABlocks.STRONZE_WRAPPED_CASING.get())
+                    .unlockedBy("has_precision_steam_component",
+                            InventoryChangeTrigger.TriggerInstance.hasItems(GTNAItems.PRECISION_STEAM_COMPONENT.get()))
+                    .save(provider);
             GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("stone_superheater_controller")
                     .inputItems(GTNABlocks.STRONZE_WRAPPED_CASING.get(), 1)
                     .inputItems(GTNAItems.HYDRAULIC_MOTOR.get(), 2)
@@ -566,7 +1247,7 @@ public class GTNAMachineRecipes {
                     .save(provider);
         }
 
-        if (enabled(GTNAMachines.HYPER_PRESSURE_REACTOR, GTNAMachines.MEGA_PRESSURE_SOLAR_BOILER)) {
+        if (enabled(GTNAMachines.HYPER_PRESSURE_REACTOR, GTNAMachines.LARGE_STEAM_SOLAR_BOILER)) {
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.HYPER_PRESSURE_REACTOR.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
@@ -574,10 +1255,10 @@ public class GTNAMachineRecipes {
                     .define('A', ChemicalHelper.get(TagPrefix.pipeHugeFluid, GTNAMaterials.Breel).getItem())
                     .define('B', Items.EMERALD)
                     .define('C', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Beryllium).getItem())
-                    .define('D', GTNAMachines.MEGA_PRESSURE_SOLAR_BOILER.asStack().getItem())
-                    .unlockedBy("has_mega_solar",
+                    .define('D', GTNAMachines.LARGE_STEAM_SOLAR_BOILER.asStack().getItem())
+                    .unlockedBy("has_large_steam_solar_boiler",
                             InventoryChangeTrigger.TriggerInstance
-                                    .hasItems(GTNAMachines.MEGA_PRESSURE_SOLAR_BOILER.asStack().getItem()))
+                                    .hasItems(GTNAMachines.LARGE_STEAM_SOLAR_BOILER.asStack().getItem()))
                     .save(provider);
         }
 
@@ -727,26 +1408,18 @@ public class GTNAMachineRecipes {
         }
 
         if (enabled(GTNAMachines.NEXUS_ME_HYPERCORE)) {
-            GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("me_super_computer_core")
-                    .inputItems(GTBlocks.HIGH_POWER_CASING.asItem(), 16)
-                    .inputItems(GTNABlocks.HIGH_STRENGTH_CONCRETE.asItem(), 32)
-                    .inputItems(GTNABlocks.COBALT_OXIDE_CERAMIC_STRONG_THERMALLY_CONDUCTIVE_MECHANICAL_BLOCK.asItem(),
-                            16)
-                    .inputItems(GTNABlocks.OXIDATION_RESISTANT_HASTELLOY_N_MECHANICAL_CASING.asItem(), 8)
-                    .inputItems(GCYMBlocks.ELECTROLYTIC_CELL.asItem(), 8)
-                    .inputItems(GCYMBlocks.MOLYBDENUM_DISILICIDE_COIL_BLOCK.asItem(), 8)
-                    .inputItems(AEBlocks.CRAFTING_UNIT.stack(16).getItem(), 16)
-                    .inputItems(CustomTags.UV_CIRCUITS, 8)
-                    .inputItems(GTItems.EMITTER_ZPM.asStack().getItem(), 8)
-                    .inputItems(GTItems.SENSOR_ZPM.asStack().getItem(), 8)
-                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(4608))
-                    .inputFluids(GTMaterials.Polybenzimidazole.getFluid(2304))
+            // GTOCore AssemblerA.me_cpu: the ME Super Computer Core controller recipe.
+            GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("me_super_computer_core")
+                    .inputItems(AEBlocks.CRAFTING_MONITOR.stack().getItem())
+                    .inputItems(GTItems.QUBIT_CENTRAL_PROCESSING_UNIT.asStack().getItem(), 32)
+                    .inputItems(GTItems.TOOL_DATA_STICK.asStack().getItem(), 16)
+                    .inputItems(GTItems.EMITTER_EV.asStack().getItem(), 8)
+                    .inputItems(GTItems.SENSOR_EV.asStack().getItem(), 8)
+                    .inputItems(CustomTags.IV_CIRCUITS, 16)
+                    .inputItems(TagPrefix.plateDouble, GTMaterials.Titanium, 32)
                     .outputItems(GTNAMachines.NEXUS_ME_HYPERCORE.asStack())
-                    .duration(900)
-                    .EUt(GTValues.VA[GTValues.ZPM])
-                    .stationResearch(b -> b.researchStack(AEBlocks.CRAFTING_UNIT.stack(1))
-                            .CWUt(256)
-                            .EUt(GTValues.VA[GTValues.ZPM]))
+                    .duration(800)
+                    .EUt(1920)
                     .save(provider);
         }
 
@@ -1176,86 +1849,413 @@ public class GTNAMachineRecipes {
         }
     }
 
+    /** GTOCore BrineRecipes: bromine and iodine extraction downstream of evaporation. */
+    private static void registerBrineChain(Consumer<FinishedRecipe> provider) {
+        GTRecipeTypes.FLUID_HEATER_RECIPES.recipeBuilder("gtna_brine_heating")
+                .inputFluids(GTNAMaterials.RawBrine, 1_000)
+                .outputFluids(GTNAMaterials.HotBrine.getFluid(1_000))
+                .duration(12_000).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_brine_chlorination")
+                .inputFluids(GTNAMaterials.HotBrine, 1_000)
+                .inputFluids(GTMaterials.Chlorine, 1_000)
+                .outputFluids(GTNAMaterials.HotChlorinatedBrominatedBrine.getFluid(2_000))
+                .duration(100).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_brine_filtration")
+                .inputFluids(GTNAMaterials.HotChlorinatedBrominatedBrine, 1_000)
+                .inputFluids(GTMaterials.Chlorine, 1_000)
+                .inputFluids(GTMaterials.Steam, 1_000)
+                .outputFluids(GTNAMaterials.HotAlkalineDebrominatedBrine.getFluid(1_000))
+                .outputFluids(GTNAMaterials.BrominatedChlorineVapor.getFluid(2_000))
+                .duration(300).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_brominated_chlorine_vapor_condensation")
+                .inputFluids(GTNAMaterials.BrominatedChlorineVapor, 1_000)
+                .inputFluids(GTMaterials.Water, 1_000)
+                .outputFluids(GTNAMaterials.AcidicBromineSolution.getFluid(1_000))
+                .outputFluids(GTMaterials.Water.getFluid(1_000))
+                .duration(200).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_bromine_vapor_concentration")
+                .inputFluids(GTNAMaterials.AcidicBromineSolution, 1_000)
+                .inputFluids(GTMaterials.Steam, 1_000)
+                .outputFluids(GTNAMaterials.ConcentratedBromineSolution.getFluid(1_000))
+                .outputFluids(GTNAMaterials.AcidicBromineExhaust.getFluid(1_000))
+                .duration(100).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.DISTILLATION_RECIPES.recipeBuilder("gtna_bromine_distillation")
+                .inputFluids(GTNAMaterials.ConcentratedBromineSolution, 1_000)
+                .outputFluids(GTMaterials.Chlorine.getFluid(500))
+                .outputFluids(GTMaterials.Bromine.getFluid(1_000))
+                .duration(500).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_brine_neutralization")
+                .inputFluids(GTNAMaterials.HotAlkalineDebrominatedBrine, 3_000)
+                .inputItems(TagPrefix.dust, GTMaterials.Potassium)
+                .outputFluids(GTNAMaterials.HotDebrominatedBrine.getFluid(2_000))
+                .outputItems(TagPrefix.dust, GTMaterials.RockSalt, 2)
+                .duration(100).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_debrominated_brine_raw_brine_mixing")
+                .inputFluids(GTNAMaterials.RawBrine, 1_000)
+                .inputFluids(GTNAMaterials.HotDebrominatedBrine, 1_000)
+                .outputFluids(GTNAMaterials.HotBrine.getFluid(1_000))
+                .outputFluids(GTNAMaterials.DebrominatedBrine.getFluid(1_000))
+                .duration(200).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_acidic_bromine_exhaust_heating")
+                .inputFluids(GTNAMaterials.AcidicBromineExhaust, 1_000)
+                .inputFluids(GTNAMaterials.HotBrine, 1_000)
+                .outputFluids(GTNAMaterials.HotChlorinatedBrominatedBrine.getFluid(1_000))
+                .outputFluids(GTMaterials.Steam.getFluid(3_000))
+                .duration(100).EUt(GTValues.VA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CENTRIFUGE_RECIPES.recipeBuilder("gtna_debrominated_brine_decomposition")
+                .inputFluids(GTNAMaterials.DebrominatedBrine, 2_000)
+                .outputFluids(GTMaterials.SaltWater.getFluid(1_000))
+                .duration(60).EUt(GTValues.VA[GTValues.MV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_brine_acidification")
+                .inputFluids(GTNAMaterials.HotBrine, 2_000)
+                .inputFluids(GTMaterials.HydrochloricAcid, 1_000)
+                .outputFluids(GTNAMaterials.HotAlkalineDebrominatedBrine.getFluid(2_000))
+                .outputFluids(GTNAMaterials.HydrogenIodide.getFluid(1_000))
+                .duration(100).EUt(GTValues.VHA[GTValues.HV]).save(provider);
+        GTRecipeTypes.CHEMICAL_RECIPES.recipeBuilder("gtna_iodine")
+                .inputFluids(GTNAMaterials.HydrogenIodide, 2_000)
+                .inputFluids(GTMaterials.Oxygen, 1_000)
+                .outputItems(TagPrefix.dust, GTMaterials.Iodine)
+                .outputFluids(GTMaterials.Water.getFluid(1_000))
+                .duration(1_000).EUt(GTValues.VHA[GTValues.HV]).save(provider);
+    }
+
     private static void registerMEStorageCoreRecipes(Consumer<FinishedRecipe> provider) {
+        // GTOCore Assembler.cell_component_*: ingredients needed by the original core recipes.
+        GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("cell_component_1m")
+                .inputItems(AEItems.CELL_COMPONENT_256K.asItem())
+                .inputItems(CustomTags.IV_CIRCUITS, 2)
+                .inputItems(AEItems.LOGIC_PROCESSOR.asItem())
+                .inputItems(AEItems.ENGINEERING_PROCESSOR.asItem())
+                .inputItems(AEItems.CALCULATION_PROCESSOR.asItem())
+                .inputItems(TagPrefix.plate, GTMaterials.Quartzite)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(72))
+                .outputItems(GTNAItems.CELL_COMPONENT_1M.asItem())
+                .EUt(480).duration(200).save(provider);
+        GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("cell_component_4m")
+                .inputItems(GTNAItems.CELL_COMPONENT_1M.asItem())
+                .inputItems(CustomTags.LuV_CIRCUITS, 2)
+                .inputItems(AEItems.LOGIC_PROCESSOR.asItem())
+                .inputItems(AEItems.ENGINEERING_PROCESSOR.asItem())
+                .inputItems(AEItems.CALCULATION_PROCESSOR.asItem())
+                .inputItems(TagPrefix.plate, GTMaterials.Quartzite)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(72))
+                .outputItems(GTNAItems.CELL_COMPONENT_4M.asItem())
+                .EUt(1920).duration(200).save(provider);
+        GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("cell_component_16m")
+                .inputItems(GTNAItems.CELL_COMPONENT_4M.asItem())
+                .inputItems(CustomTags.ZPM_CIRCUITS, 2)
+                .inputItems(AEItems.LOGIC_PROCESSOR.asItem())
+                .inputItems(AEItems.ENGINEERING_PROCESSOR.asItem())
+                .inputItems(AEItems.CALCULATION_PROCESSOR.asItem())
+                .inputItems(TagPrefix.plate, GTMaterials.Quartzite)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(72))
+                .outputItems(GTNAItems.CELL_COMPONENT_16M.asItem())
+                .EUt(7680).duration(200).save(provider);
+        GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("cell_component_64m")
+                .inputItems(GTNAItems.CELL_COMPONENT_16M.asItem())
+                .inputItems(CustomTags.UV_CIRCUITS, 2)
+                .inputItems(AEItems.LOGIC_PROCESSOR.asItem())
+                .inputItems(AEItems.ENGINEERING_PROCESSOR.asItem())
+                .inputItems(AEItems.CALCULATION_PROCESSOR.asItem())
+                .inputItems(TagPrefix.plate, GTMaterials.Quartzite)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(72))
+                .outputItems(GTNAItems.CELL_COMPONENT_64M.asItem())
+                .EUt(30720).duration(200).save(provider);
+        GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("cell_component_256m")
+                .inputItems(GTNAItems.CELL_COMPONENT_64M.asItem())
+                .inputItems(CustomTags.UHV_CIRCUITS, 2)
+                .inputItems(AEItems.LOGIC_PROCESSOR.asItem())
+                .inputItems(AEItems.ENGINEERING_PROCESSOR.asItem())
+                .inputItems(AEItems.CALCULATION_PROCESSOR.asItem())
+                .inputItems(TagPrefix.plate, GTMaterials.Quartzite)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(72))
+                .outputItems(GTNAItems.CELL_COMPONENT_256M.asItem())
+                .EUt(122880).duration(200).save(provider);
+
+        // GTOCore Assembler.t*_me_storage_core, using the matching component at each tier.
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t1_me_storage_core")
-                .inputItems(AEBlocks.CRAFTING_STORAGE_64K.stack(1).getItem())
-                .inputItems(TagPrefix.plate, GTNAMaterials.DarkSteel, 4)
+                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack().getItem())
+                .inputItems(GTNAItems.CELL_COMPONENT_1M.asItem())
+                .inputItems(GTItems.EMITTER_EV.asItem())
+                .inputItems(GTItems.SENSOR_EV.asItem())
+                .inputItems(TagPrefix.plateDouble, GTMaterials.Titanium, 4)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNABlocks.T1_ME_STORAGE_CORE.asItem())
                 .duration(200)
-                .EUt(GTValues.VA[GTValues.EV])
+                .EUt(1920)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t2_me_storage_core")
-                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack(1).getItem())
-                .inputItems(GTNABlocks.T1_ME_STORAGE_CORE.asItem())
-                .inputItems(TagPrefix.plate, GTNAMaterials.DarkSteel, 8)
-                .inputFluids(GTMaterials.SolderingAlloy.getFluid(1152))
+                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack().getItem())
+                .inputItems(GTNAItems.CELL_COMPONENT_4M.asItem())
+                .inputItems(GTItems.EMITTER_IV.asItem())
+                .inputItems(GTItems.SENSOR_IV.asItem())
+                .inputItems(TagPrefix.plateDouble, GTMaterials.TungstenSteel, 4)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNABlocks.T2_ME_STORAGE_CORE.asItem())
-                .duration(240)
-                .EUt(GTValues.VA[GTValues.IV])
+                .duration(200)
+                .EUt(7680)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t3_me_storage_core")
-                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack(2).getItem(), 2)
-                .inputItems(GTNABlocks.T2_ME_STORAGE_CORE.asItem())
-                .inputItems(TagPrefix.plate, GTMaterials.TungstenSteel, 8)
-                .inputFluids(GTMaterials.Polybenzimidazole.getFluid(576))
+                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack().getItem())
+                .inputItems(GTNAItems.CELL_COMPONENT_16M.asItem())
+                .inputItems(GTItems.EMITTER_LuV.asItem())
+                .inputItems(GTItems.SENSOR_LuV.asItem())
+                .inputItems(TagPrefix.plateDouble, GTMaterials.RhodiumPlatedPalladium, 4)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNABlocks.T3_ME_STORAGE_CORE.asItem())
-                .duration(280)
-                .EUt(GTValues.VA[GTValues.LuV])
+                .duration(200)
+                .EUt(30720)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t4_me_storage_core")
-                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack(4).getItem(), 4)
-                .inputItems(GTNABlocks.T3_ME_STORAGE_CORE.asItem())
-                .inputItems(TagPrefix.plate, GTMaterials.RhodiumPlatedPalladium, 8)
-                .inputFluids(GTMaterials.Polybenzimidazole.getFluid(1152))
+                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack().getItem())
+                .inputItems(GTNAItems.CELL_COMPONENT_64M.asItem())
+                .inputItems(GTItems.EMITTER_ZPM.asItem())
+                .inputItems(GTItems.SENSOR_ZPM.asItem())
+                .inputItems(TagPrefix.plateDouble, GTMaterials.NaquadahAlloy, 4)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNABlocks.T4_ME_STORAGE_CORE.asItem())
-                .duration(320)
-                .EUt(GTValues.VA[GTValues.ZPM])
+                .duration(200)
+                .EUt(122880)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t5_me_storage_core")
-                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack(8).getItem(), 8)
-                .inputItems(GTNABlocks.T4_ME_STORAGE_CORE.asItem())
-                .inputItems(TagPrefix.plate, GTMaterials.NaquadahAlloy, 8)
-                .inputFluids(GTMaterials.Polybenzimidazole.getFluid(2304))
+                .inputItems(AEBlocks.CRAFTING_STORAGE_256K.stack().getItem())
+                .inputItems(GTNAItems.CELL_COMPONENT_256M.asItem())
+                .inputItems(GTItems.EMITTER_UV.asItem())
+                .inputItems(GTItems.SENSOR_UV.asItem())
+                .inputItems(TagPrefix.plateDouble, GTMaterials.Darmstadtium, 4)
+                .inputFluids(GTMaterials.SolderingAlloy.getFluid(576))
                 .outputItems(GTNABlocks.T5_ME_STORAGE_CORE.asItem())
-                .duration(360)
+                .duration(200)
                 .EUt(GTValues.VA[GTValues.ZPM])
                 .save(provider);
 
+        // GTOCore AssemblerA.t*_crafting_storage_core.
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t1_crafting_storage_core")
+                .inputItems(AEBlocks.CRAFTING_UNIT.stack().getItem())
                 .inputItems(GTNABlocks.T1_ME_STORAGE_CORE.asItem())
-                .inputItems(AEBlocks.CRAFTING_UNIT.stack(4).getItem(), 4)
+                .inputItems(AEBlocks.CRAFTING_ACCELERATOR.stack().getItem())
+                .inputItems(AEItems.ADVANCED_CARD.asItem(), 4)
                 .outputItems(GTNABlocks.T1_CRAFTING_STORAGE_CORE.asItem())
-                .duration(120)
-                .EUt(GTValues.VA[GTValues.EV])
+                .duration(200)
+                .EUt(1920)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t2_crafting_storage_core")
+                .inputItems(AEBlocks.CRAFTING_UNIT.stack().getItem())
                 .inputItems(GTNABlocks.T2_ME_STORAGE_CORE.asItem())
-                .inputItems(AEBlocks.CRAFTING_UNIT.stack(8).getItem(), 8)
+                .inputItems(AEBlocks.CRAFTING_ACCELERATOR.stack().getItem())
+                .inputItems(AEItems.ADVANCED_CARD.asItem(), 4)
                 .outputItems(GTNABlocks.T2_CRAFTING_STORAGE_CORE.asItem())
-                .duration(140)
-                .EUt(GTValues.VA[GTValues.IV])
+                .duration(200)
+                .EUt(7680)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t3_crafting_storage_core")
+                .inputItems(AEBlocks.CRAFTING_UNIT.stack().getItem())
                 .inputItems(GTNABlocks.T3_ME_STORAGE_CORE.asItem())
-                .inputItems(AEBlocks.CRAFTING_UNIT.stack(16).getItem(), 16)
+                .inputItems(AEBlocks.CRAFTING_ACCELERATOR.stack().getItem())
+                .inputItems(AEItems.ADVANCED_CARD.asItem(), 4)
                 .outputItems(GTNABlocks.T3_CRAFTING_STORAGE_CORE.asItem())
-                .duration(160)
-                .EUt(GTValues.VA[GTValues.LuV])
+                .duration(200)
+                .EUt(30720)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t4_crafting_storage_core")
+                .inputItems(AEBlocks.CRAFTING_UNIT.stack().getItem())
                 .inputItems(GTNABlocks.T4_ME_STORAGE_CORE.asItem())
-                .inputItems(AEBlocks.CRAFTING_UNIT.stack(32).getItem(), 32)
+                .inputItems(AEBlocks.CRAFTING_ACCELERATOR.stack().getItem())
+                .inputItems(AEItems.ADVANCED_CARD.asItem(), 4)
                 .outputItems(GTNABlocks.T4_CRAFTING_STORAGE_CORE.asItem())
-                .duration(180)
-                .EUt(GTValues.VA[GTValues.ZPM])
+                .duration(200)
+                .EUt(122880)
                 .save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("t5_crafting_storage_core")
+                .inputItems(AEBlocks.CRAFTING_UNIT.stack().getItem())
                 .inputItems(GTNABlocks.T5_ME_STORAGE_CORE.asItem())
-                .inputItems(AEBlocks.CRAFTING_UNIT.stack(64).getItem(), 64)
+                .inputItems(AEBlocks.CRAFTING_ACCELERATOR.stack().getItem())
+                .inputItems(AEItems.ADVANCED_CARD.asItem(), 4)
                 .outputItems(GTNABlocks.T5_CRAFTING_STORAGE_CORE.asItem())
                 .duration(200)
                 .EUt(GTValues.VA[GTValues.ZPM])
+                .save(provider);
+
+        // --- GTLsupb ports (LGPLv3) ---
+        // Original modpack recipe for gtlcore:multi_functional_casing: BCB/DAD/BCB -> 2 casings.
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNABlocks.UNIVERSAL_FACTORY_CASING.asItem(), 2)
+                .pattern("BCB")
+                .pattern("DAD")
+                .pattern("BCB")
+                .define('A', GTBlocks.CASING_STEEL_SOLID.get())
+                .define('B', ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Aluminium).getItem())
+                .define('C', GTItems.ELECTRIC_MOTOR_MV.asItem())
+                .define('D', GTItems.ELECTRIC_PISTON_MV.asItem())
+                .unlockedBy("has_solid_machine_casing",
+                        InventoryChangeTrigger.TriggerInstance.hasItems(GTBlocks.CASING_STEEL_SOLID.get()))
+                .save(provider);
+
+        if (enabled(GTNAMachines.UNIVERSAL_FACTORY)) {
+            // Original GTLsupb modpack recipe: MV components around the functional casing.
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.UNIVERSAL_FACTORY.asStack().getItem())
+                    .pattern("ABC")
+                    .pattern("DEF")
+                    .pattern("GHI")
+                    .define('A', GTItems.ELECTRIC_MOTOR_MV.asItem())
+                    .define('B', GTItems.ROBOT_ARM_MV.asItem())
+                    .define('C', GTItems.ELECTRIC_PISTON_MV.asItem())
+                    .define('D', GTItems.ELECTRIC_PUMP_MV.asItem())
+                    .define('E', GTNABlocks.UNIVERSAL_FACTORY_CASING.asItem())
+                    .define('F', GTItems.EMITTER_MV.asItem())
+                    .define('G', GTItems.CONVEYOR_MODULE_MV.asItem())
+                    .define('H', GTItems.SENSOR_MV.asItem())
+                    .define('I', GTItems.FLUID_REGULATOR_MV.asItem())
+                    .unlockedBy("has_universal_factory_casing",
+                            InventoryChangeTrigger.TriggerInstance
+                                    .hasItems(GTNABlocks.UNIVERSAL_FACTORY_CASING.asItem()))
+                    .save(provider);
+        }
+
+        if (enabled(GTNAMachines.PRIMITIVE_STONE_FURNACE)) {
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.PRIMITIVE_STONE_FURNACE.asStack().getItem())
+                    .pattern("AAA")
+                    .pattern("ABA")
+                    .pattern("AAA")
+                    .define('A', Blocks.STONE)
+                    .define('B', Blocks.FURNACE)
+                    .unlockedBy("has_stone", InventoryChangeTrigger.TriggerInstance.hasItems(Blocks.STONE))
+                    .save(provider);
+        }
+
+        // GTOCore Vanilla.java:425.
+        if (enabled(GTNAMachines.LIQUEFACTION_FURNACE)) {
+            ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines.LIQUEFACTION_FURNACE.asStack().getItem())
+                    .pattern("ABA")
+                    .pattern("CDC")
+                    .pattern("ABA")
+                    .define('A', Objects.requireNonNull(ChemicalHelper.getTag(TagPrefix.plate, GTMaterials.Invar)))
+                    .define('B', ChemicalHelper.get(TagPrefix.cableGtDouble, GTMaterials.Nickel).getItem())
+                    .define('C', Blocks.BLAST_FURNACE)
+                    .define('D', GTMachines.EXTRACTOR[GTValues.LV].asStack().getItem())
+                    .unlockedBy("has_invar_plate", InventoryChangeTrigger.TriggerInstance
+                            .hasItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.Invar).getItem()))
+                    .save(provider);
+        }
+
+        // Integrated Ore Processors (GTLCore port, G-0055). GTLCore registers the blocks without a
+        // craft recipe; these are GTNA's own, built from the materials of each structure.
+        if (enabled(GTNAMachines.INTEGRATED_ORE_PROCESSOR)) {
+            GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("integrated_ore_processor")
+                    .inputItems(GTBlocks.CASING_STAINLESS_CLEAN.asItem(), 4)
+                    .inputItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.BlueSteel).getItem(), 4)
+                    .inputItems(GTBlocks.CASING_TUNGSTENSTEEL_GEARBOX.asItem(), 2)
+                    .inputItems(GTBlocks.CASING_TUNGSTENSTEEL_PIPE.asItem(), 2)
+                    .inputItems(GTItems.ELECTRIC_MOTOR_EV, 4)
+                    .inputItems(GTItems.ELECTRIC_PUMP_EV, 2)
+                    .inputItems(CustomTags.EV_CIRCUITS, 4)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(288))
+                    .outputItems(GTNAMachines.INTEGRATED_ORE_PROCESSOR.asStack())
+                    .duration(600)
+                    .EUt(GTValues.VA[GTValues.EV])
+                    .save(provider);
+        }
+
+        if (enabled(GTNAMachines.ADVANCED_INTEGRATED_ORE_PROCESSOR)) {
+            GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("advanced_integrated_ore_processor")
+                    .inputItems(GTBlocks.CASING_TUNGSTENSTEEL_ROBUST.asItem(), 8)
+                    .inputItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.HSSS).getItem(), 8)
+                    .inputItems(GTNABlocks.RESTRAINT_DEVICE.asItem(), 4)
+                    .inputItems(GTNABlocks.BOROSILICATE_GLASS_BLOCK.asItem(), 8)
+                    .inputItems(GTItems.EMITTER_UHV, 4)
+                    .inputItems(GTItems.SENSOR_UHV, 4)
+                    .inputItems(GTItems.FIELD_GENERATOR_UHV, 4)
+                    .inputItems(CustomTags.UHV_CIRCUITS, 4)
+                    .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.NaquadahAlloy).getItem(), 4)
+                    .inputFluids(GTMaterials.SolderingAlloy.getFluid(1296))
+                    .outputItems(GTNAMachines.ADVANCED_INTEGRATED_ORE_PROCESSOR.asStack())
+                    .duration(1200)
+                    .EUt(GTValues.VA[GTValues.UHV])
+                    .stationResearch(b -> b.researchStack(GTNABlocks.RESTRAINT_DEVICE.asStack())
+                            .CWUt(1024)
+                            .EUt(GTValues.VA[GTValues.UHV]))
+                    .save(provider);
+        }
+
+        // Brick Kiln (GTOCore port, G-0060): fires bricks/ceramics from compressed clay + coal.
+        if (enabled(GTNAMachines.BRICK_KILN)) {
+            GTNARecipeType.BRICK_FURNACE_RECIPES.recipeBuilder("brick")
+                    .inputItems(Items.COAL)
+                    .inputItems(GTItems.COMPRESSED_CLAY, 8)
+                    .outputItems(Blocks.BRICKS.asItem(), 2)
+                    .duration(150)
+                    .save(provider);
+            GTNARecipeType.BRICK_FURNACE_RECIPES.recipeBuilder("coke_oven_brick")
+                    .inputItems(Items.COAL)
+                    .inputItems(GTItems.COMPRESSED_COKE_CLAY, 8)
+                    .outputItems(GTBlocks.CASING_COKE_BRICKS.asItem(), 2)
+                    .duration(150)
+                    .save(provider);
+            GTNARecipeType.BRICK_FURNACE_RECIPES.recipeBuilder("firebrick")
+                    .inputItems(Items.COAL)
+                    .inputItems(GTItems.COMPRESSED_FIRECLAY, 8)
+                    .outputItems(GTBlocks.CASING_PRIMITIVE_BRICKS.asItem(), 2)
+                    .duration(150)
+                    .save(provider);
+        }
+
+        // --- Large steam casings (GTNL port; textures from Modernity-GTNH) ---
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNABlocks.INDUSTRIAL_STEAM_CASING.asItem())
+                .pattern("AAA")
+                .pattern("ACA")
+                .pattern("AAA")
+                .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Brass).getItem())
+                .define('C', ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Bronze).getItem())
+                .unlockedBy("has_bronze_frame", InventoryChangeTrigger.TriggerInstance
+                        .hasItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Bronze).getItem()))
+                .save(provider);
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNABlocks.ADVANCED_INDUSTRIAL_STEAM_CASING.asItem())
+                .pattern("AAA")
+                .pattern("ACA")
+                .pattern("AAA")
+                .define('A', ChemicalHelper.get(TagPrefix.plate, GTMaterials.Iron).getItem())
+                .define('C', ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Steel).getItem())
+                .unlockedBy("has_steel_frame", InventoryChangeTrigger.TriggerInstance
+                        .hasItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Steel).getItem()))
+                .save(provider);
+        if (enabled(GTNAMachines.STEAM_MANUFACTURER)) {
+            // GTNL SteamManufacturer parity: 6 plates + frame + circuit(1) -> 1 casing, 2 s at 16 EU/t.
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("industrial_steam_casing")
+                    .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.Brass).getItem(), 6)
+                    .inputItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Bronze).getItem(), 1)
+                    .inputItems(IntCircuitIngredient.of(1))
+                    .outputItems(GTNABlocks.INDUSTRIAL_STEAM_CASING.asStack())
+                    .duration(40)
+                    .EUt(16)
+                    .save(provider);
+            GTNARecipeType.HYDRAULIC_MANUFACTURING.recipeBuilder("advanced_industrial_steam_casing")
+                    .inputItems(ChemicalHelper.get(TagPrefix.plate, GTMaterials.Iron).getItem(), 6)
+                    .inputItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.Steel).getItem(), 1)
+                    .inputItems(IntCircuitIngredient.of(1))
+                    .outputItems(GTNABlocks.ADVANCED_INDUSTRIAL_STEAM_CASING.asStack())
+                    .duration(40)
+                    .EUt(16)
+                    .save(provider);
+        }
+    }
+
+    /**
+     * Port of GTOCore's liquefaction branch in {@code GTORecyclingRecipeHandler.processCrushing}.
+     */
+    private static void addLiquefactionRecipe(Consumer<FinishedRecipe> provider, TagPrefix prefix, Material material) {
+        var stack = ChemicalHelper.get(prefix, material);
+        if (stack.isEmpty() || !material.hasProperty(PropertyKey.FLUID) || material.getFluid() == null ||
+                (prefix == TagPrefix.dust && material.hasProperty(PropertyKey.BLAST))) {
+            return;
+        }
+        long amount = prefix.getMaterialAmount(material);
+        String itemPath = BuiltInRegistries.ITEM.getKey(stack.getItem()).getPath();
+        GTNARecipeType.LIQUEFACTION_FURNACE_RECIPES.recipeBuilder("extract_" + itemPath)
+                .inputItems(stack)
+                .outputFluids(material.getFluid((int) (amount * GTValues.L / GTValues.M)))
+                .duration((int) Math.max(1, amount * material.getMass() / GTValues.M))
+                .EUt(material.getBlastTemperature() >= 2800 ? GTValues.VA[GTValues.LV] : GTValues.VA[GTValues.ULV])
+                .blastFurnaceTemp(Math.max(800, (int) (material.getBlastTemperature() * 0.6)))
                 .save(provider);
     }
 
@@ -1266,6 +2266,24 @@ public class GTNAMachineRecipes {
             }
         }
         return true;
+    }
+
+    private static void rocketEngine(Consumer<FinishedRecipe> provider, String name, int tier,
+                                     Material rotor, Material cable, TagKey<Item> circuit,
+                                     ItemLike motor, ItemLike pump) {
+        ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
+                GTNAMachines3.ROCKET_ENGINE_GENERATOR[tier].asStack().getItem())
+                .pattern("ABA")
+                .pattern("CDC")
+                .pattern("EFE")
+                .define('A', Objects.requireNonNull(ChemicalHelper.getTag(TagPrefix.rotor, rotor)))
+                .define('B', circuit)
+                .define('C', motor)
+                .define('D', GTMachines.HULL[tier].asStack().getItem())
+                .define('E', Objects.requireNonNull(ChemicalHelper.getBlock(TagPrefix.cableGtDouble, cable)))
+                .define('F', pump)
+                .unlockedBy("has_rocket_motor", InventoryChangeTrigger.TriggerInstance.hasItems(motor))
+                .save(provider, GTNACORE.id(name + "_rocket_engine"));
     }
 
     private static Item machineItem(String id) {

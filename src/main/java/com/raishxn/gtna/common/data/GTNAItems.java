@@ -10,6 +10,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import com.raishxn.gtna.GTNACORE;
 import com.raishxn.gtna.common.item.CoordinateCardBehavior;
+import com.raishxn.gtna.common.item.PatternBufferCopyBehavior;
 import com.raishxn.gtna.common.item.PatternBufferUpgraderBehavior;
 import com.raishxn.gtna.common.item.RealityRipperSwordItem;
 import com.raishxn.gtna.common.item.StructureDetectBehavior;
@@ -62,7 +63,14 @@ public class GTNAItems {
     public static ItemEntry<ComponentItem> PATTERN_BUFFER_UPGRADE_21;
     public static ItemEntry<ComponentItem> PATTERN_BUFFER_UPGRADE_32;
     public static ItemEntry<ComponentItem> PATTERN_BUFFER_UPGRADE_72;
+    public static ItemEntry<ComponentItem> PATTERN_BUFFER_COPY_CARD;
+    public static ItemEntry<ComponentItem> PATTERN_BUFFER_CUT_CARD;
     public static ItemEntry<ComponentItem> INFINITE_CELL_COMPONENT;
+    public static ItemEntry<ComponentItem> CELL_COMPONENT_1M;
+    public static ItemEntry<ComponentItem> CELL_COMPONENT_4M;
+    public static ItemEntry<ComponentItem> CELL_COMPONENT_16M;
+    public static ItemEntry<ComponentItem> CELL_COMPONENT_64M;
+    public static ItemEntry<ComponentItem> CELL_COMPONENT_256M;
     public static ItemEntry<ComponentItem> ANNIHILATION_CONSTRAINER;
     public static ItemEntry<ComponentItem> NEUTRONIUM_ANTIMATTER_FUEL_ROD;
     public static ItemEntry<ComponentItem> DRACONIUM_ANTIMATTER_FUEL_ROD;
@@ -71,8 +79,16 @@ public class GTNAItems {
     public static ItemEntry<RealityRipperSwordItem> REALITY_RIPPER_SWORD;
     public static ItemEntry<ComponentItem> INFINITE_STEAM_SINGLEBLOCK_COVER;
     public static ItemEntry<ComponentItem> INFINITE_ELECTRIC_SINGLEBLOCK_COVER;
+    /** GTOCore grind balls: durability 50 / tier 1 and durability 100 / tier 2. */
+    public static ItemEntry<ComponentItem> GRINDBALL_SOAPSTONE;
+    public static ItemEntry<ComponentItem> GRINDBALL_ALUMINIUM;
 
     public static void init() {
+        CELL_COMPONENT_1M = registerCellComponent(1);
+        CELL_COMPONENT_4M = registerCellComponent(4);
+        CELL_COMPONENT_16M = registerCellComponent(16);
+        CELL_COMPONENT_64M = registerCellComponent(64);
+        CELL_COMPONENT_256M = registerCellComponent(256);
         STRUCTURE_DETECT = REGISTRATE
                 .item("structure_detect", ComponentItem::create)
                 .lang("Structure Detector")
@@ -151,6 +167,20 @@ public class GTNAItems {
                 .register();
         registerIndustrialComponents();
 
+        // GTOCore grinding balls for the ISA Mill. Soapstone is tier 1 (50 durability) and
+        // Aluminium is tier 2 (100 durability); the tier is read by BallHatchPartMachine.
+        GRINDBALL_SOAPSTONE = REGISTRATE.item("grindball_soapstone", ComponentItem::create)
+                .lang("Soapstone Grinding Ball")
+                .properties(stack -> stack.stacksTo(1).durability(50))
+                .model((ctx, provider) -> provider.generated(ctx, GTNACORE.id("item/grindball_soapstone")))
+                .register();
+
+        GRINDBALL_ALUMINIUM = REGISTRATE.item("grindball_aluminium", ComponentItem::create)
+                .lang("Aluminium Grinding Ball")
+                .properties(stack -> stack.stacksTo(1).durability(100))
+                .model((ctx, provider) -> provider.generated(ctx, GTNACORE.id("item/grindball_aluminium")))
+                .register();
+
         NEXUS_LINKER = REGISTRATE.item("nexus_linker", com.raishxn.gtna.common.item.NexusLinkerItem::new)
                 .lang("Nexus Linker")
                 .properties(stack -> stack.stacksTo(1))
@@ -217,6 +247,20 @@ public class GTNAItems {
                 .model((ctx, provider) -> provider.generated(ctx, GTNACORE.id("item/ex_pattern_buffer_ultra_upgrader")))
                 .register();
 
+        PATTERN_BUFFER_COPY_CARD = REGISTRATE.item("pattern_buffer_copy_card", ComponentItem::create)
+                .lang("Pattern Buffer Copy Card")
+                .properties(stack -> stack.stacksTo(1))
+                .onRegister(attach(new PatternBufferCopyBehavior(false)))
+                .model((ctx, provider) -> provider.generated(ctx, GTNACORE.id("item/pattern_buffer_copy_card")))
+                .register();
+
+        PATTERN_BUFFER_CUT_CARD = REGISTRATE.item("pattern_buffer_cut_card", ComponentItem::create)
+                .lang("Pattern Buffer Cut Card")
+                .properties(stack -> stack.stacksTo(1))
+                .onRegister(attach(new PatternBufferCopyBehavior(true)))
+                .model((ctx, provider) -> provider.generated(ctx, GTNACORE.id("item/pattern_buffer_cut_card")))
+                .register();
+
         INFINITE_CELL_COMPONENT = REGISTRATE.item("infinite_cell_component", ComponentItem::create)
                 .lang("Infinite Cell Component")
                 .properties(stack -> stack.stacksTo(64))
@@ -270,6 +314,15 @@ public class GTNAItems {
                 .onRegister(attach(new CoverPlaceBehavior(GTNACovers.INFINITE_ELECTRIC_SINGLEBLOCK_COVER)))
                 .model((ctx, provider) -> provider.generated(ctx,
                         GTNACORE.id("item/733")))
+                .register();
+    }
+
+    private static ItemEntry<ComponentItem> registerCellComponent(int capacityM) {
+        String name = "cell_component_" + capacityM + "m";
+        return REGISTRATE.item(name, ComponentItem::create)
+                .lang(capacityM + "M Cell Component")
+                .onRegister(attach(new TooltipBehavior(lines -> lines.add(GTNASources.line(GTNASources.GTO)))))
+                .model((ctx, provider) -> provider.generated(ctx, GTNACORE.id("item/" + name)))
                 .register();
     }
 

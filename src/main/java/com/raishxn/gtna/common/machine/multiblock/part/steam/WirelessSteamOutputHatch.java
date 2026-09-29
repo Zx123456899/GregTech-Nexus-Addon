@@ -8,49 +8,89 @@ import com.gregtechceu.gtceu.api.machine.IMachineBlockEntity;
 import com.gregtechceu.gtceu.api.machine.trait.NotifiableFluidTank;
 import com.gregtechceu.gtceu.common.data.GTMaterials;
 import com.gregtechceu.gtceu.common.machine.multiblock.part.SteamHatchPartMachine;
+import com.gregtechceu.gtceu.utils.FormattingUtil;
 
 import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
+import com.lowdragmc.lowdraglib.gui.texture.GuiTextureGroup;
+import com.lowdragmc.lowdraglib.gui.util.ClickData;
+import com.lowdragmc.lowdraglib.gui.widget.ButtonWidget;
 import com.lowdragmc.lowdraglib.gui.widget.ImageWidget;
 import com.lowdragmc.lowdraglib.gui.widget.LabelWidget;
 
 import net.minecraft.MethodsReturnNonnullByDefault;
+import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
+import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.fluids.capability.IFluidHandler;
 
 import com.raishxn.gtna.api.capability.SteamWirelessNetworkManager;
+import com.raishxn.gtna.client.hud.WirelessSteamHudBridge;
+import com.raishxn.gtna.common.data.SteamNetworkData;
 import com.raishxn.gtna.config.ConfigHolder;
 
 import java.util.UUID;
 
 import javax.annotation.ParametersAreNonnullByDefault;
 
+/**
+ * Wireless steam output hatch: moves its whole tank into the placer's global steam pool every tick.
+ *
+ * <p>
+ * GTNL {@code WirelessSteamDynamoHatch} parity: no per-tick cap by default (the config rate is an
+ * optional throttle), simulate-drain → add exactly the drained amount → execute-drain, so the
+ * network can never receive more than the tank gave up and the hatch can never duplicate steam.
+ */
 @ParametersAreNonnullByDefault
 @MethodsReturnNonnullByDefault
 public class WirelessSteamOutputHatch extends SteamHatchPartMachine {
 
     private final long transferRate;
     private final boolean isSteel;
+    private long lastTransferAmount;
+    private long lastTransferTick = -1L;
 
     public WirelessSteamOutputHatch(IMachineBlockEntity holder, boolean isSteel, Object... args) {
-        super(holder, args);
+        // Pass the tier down through the varargs so createTank() (called from the super constructor)
+        // can size the tank correctly before any field of this class is assigned.
+        super(holder, withSteel(isSteel, args));
         this.isSteel = isSteel;
         this.transferRate = isSteel ? ConfigHolder.INSTANCE.wirelessSteam.steelTransferRate :
                 ConfigHolder.INSTANCE.wirelessSteam.bronzeTransferRate;
-        this.setWorkingEnabled(false);
-        if (this.isSteel) {
-            if (this.tank.getStorages().length > 0) {
-                this.tank.getStorages()[0].setCapacity(ConfigHolder.INSTANCE.wirelessSteam.steelBuffer);
-            }
-        } else if (this.tank.getStorages().length > 0) {
-            this.tank.getStorages()[0].setCapacity(ConfigHolder.INSTANCE.wirelessSteam.bronzeBuffer);
-        }
+    }
+
+    private static Object[] withSteel(boolean isSteel, Object... args) {
+        Object[] all = new Object[args.length + 1];
+        all[0] = isSteel;
+        System.arraycopy(args, 0, all, 1, args.length);
+        return all;
+    }
+
+    @Override
+    public boolean isWorkingEnabled() {
+        // The hatch is wireless-only and has no AUTO IO (see the updateTankSubscription overrides);
+        // the GTCEu workingEnabled field is the AUTO IO switch, not the network state, so mirroring
+        // it here made Jade report "Working Disabled" for a hatch that is working fine.
+        return ConfigHolder.INSTANCE.wirelessSteam.enabled;
+    }
+
+    @Override
+    protected void updateTankSubscription() {
+        // Never auto-export to adjacent fluid handlers: the wireless network is the only sink.
+    }
+
+    @Override
+    protected void updateTankSubscription(Direction newFacing) {
+        // Same as above; onRotated() calls this overload.
     }
 
     @Override
     protected NotifiableFluidTank createTank(int initialCapacity, int slots, Object... args) {
-        int configuredCapacity = isSteel ? ConfigHolder.INSTANCE.wirelessSteam.steelBuffer :
-                ConfigHolder.INSTANCE.wirelessSteam.bronzeBuffer;
+        boolean steel = args.length > 0 && args[0] instanceof Boolean value && value;
+        int configuredCapacity = steel ? ConfigHolder.INSTANCE.wirelessSteam.steelOutputBuffer :
+                ConfigHolder.INSTANCE.wirelessSteam.bronzeOutputBuffer;
         return new NotifiableFluidTank(this, 1, configuredCapacity, IO.OUT)
                 .setFilter(fluidStack -> fluidStack.getFluid().is(GTMaterials.Steam.getFluidTag()));
     }
@@ -58,9 +98,52 @@ public class WirelessSteamOutputHatch extends SteamHatchPartMachine {
     @Override
     public void onLoad() {
         super.onLoad();
-        if (getLevel() != null && !getLevel().isClientSide) {
+        if (getLevel() instanceof ServerLevel serverLevel) {
+            reportTank(serverLevel);
             this.subscribeServerTick(this::updateWireless);
         }
+    }
+
+    /** Registers this hatch with the inspection registry, including its current tank level. */
+    private SteamNetworkData.ConnectionInfo reportTank(ServerLevel serverLevel) {
+        UUID ownerId = getOwnerUUID();
+        if (ownerId == null) return null;
+        SteamNetworkData.ConnectionInfo info = SteamWirelessNetworkManager.reportConnection(serverLevel, ownerId,
+                GlobalPos.of(serverLevel.dimension(), getPos()), false, isSteel);
+        if (info != null) {
+            info.tankAmount = tank.getFluidInTank(0).getAmount();
+            info.tankCapacity = tank.getTankCapacity(0);
+        }
+        return info;
+    }
+
+    /** The configured per-tick cap for this hatch; {@link Integer#MAX_VALUE} means "whole buffer". */
+    public long getTransferRate() {
+        return transferRate <= 0 ? Integer.MAX_VALUE : transferRate;
+    }
+
+    /** Whether this hatch throttles below its buffer (false = the GTNL "move the whole tank" mode). */
+    public boolean isTransferLimited() {
+        return getTransferRate() < tank.getTankCapacity(0);
+    }
+
+    /** Signed mB moved by the last transfer: positive = pushed to the network, 0 = none yet. */
+    public long getLastTransferAmount() {
+        return lastTransferAmount;
+    }
+
+    /** Game tick of the last transfer, or {@code -1} when the hatch has not moved anything yet. */
+    public long getLastTransferTick() {
+        return lastTransferTick;
+    }
+
+    private String rateText() {
+        long rate = getTransferRate();
+        if (rate >= Integer.MAX_VALUE) {
+            return Component.translatable("gtna.machine.wireless_steam.transfer_rate.unlimited").getString();
+        }
+        return Component.translatable("gtna.machine.wireless_steam.transfer_rate",
+                FormattingUtil.formatNumbers(rate)).getString();
     }
 
     private void updateWireless() {
@@ -70,16 +153,32 @@ public class WirelessSteamOutputHatch extends SteamHatchPartMachine {
         if (getLevel() instanceof ServerLevel serverLevel) {
             UUID ownerId = getOwnerUUID();
             if (ownerId == null) return;
+            SteamNetworkData.ConnectionInfo info = reportTank(serverLevel);
 
             long currentSteam = tank.getFluidInTank(0).getAmount();
+            if (currentSteam <= 0) return;
 
-            if (currentSteam > 0) {
-                int toPush = (int) Math.min(currentSteam, transferRate);
+            // GTNL WirelessSteamDynamoHatch parity: the whole tank moves into the network every
+            // tick. The config rate is only an optional throttle and defaults to the buffer size,
+            // so a boiler can never strand a recipe cycle behind a cap smaller than the tank.
+            long limit = getTransferRate();
+            int toPush = (int) Math.min(currentSteam, Math.min(limit, Integer.MAX_VALUE));
+            if (toPush <= 0) return;
 
-                boolean success = SteamWirelessNetworkManager.addSteamToGlobalSteamMap(serverLevel, ownerId, toPush);
+            // GTNL robustness: simulate the drain first so the network only receives what the
+            // tank can actually give up. The drain result is what gets added, never a guess.
+            FluidStack simulated = tank.drain(toPush, IFluidHandler.FluidAction.SIMULATE);
+            int amount = simulated.getAmount();
+            if (amount <= 0) return;
 
-                if (success) {
-                    tank.drain(toPush, IFluidHandler.FluidAction.EXECUTE);
+            if (SteamWirelessNetworkManager.addSteamToGlobalSteamMap(serverLevel, ownerId, amount)) {
+                tank.drain(amount, IFluidHandler.FluidAction.EXECUTE);
+                lastTransferAmount = amount;
+                lastTransferTick = serverLevel.getGameTime();
+                if (info != null) {
+                    info.tankAmount = tank.getFluidInTank(0).getAmount();
+                    info.lastTransferAmount = lastTransferAmount;
+                    info.lastTransferTick = lastTransferTick;
                 }
             }
         }
@@ -93,10 +192,31 @@ public class WirelessSteamOutputHatch extends SteamHatchPartMachine {
                 .widget(new LabelWidget(11, 20, "gtceu.gui.fluid_amount"))
                 .widget(new LabelWidget(11, 30, () -> tank.getFluidInTank(0).getAmount() + "").setTextColor(-1)
                         .setDropShadow(true))
+                .widget(new LabelWidget(11, 42, this::rateText).setTextColor(-1).setDropShadow(true))
                 .widget(new LabelWidget(6, 6, getBlockState().getBlock().getDescriptionId()))
                 .widget(new TankWidget(tank.getStorages()[0], 90, 35, true, true)
                         .setBackground(GuiTextures.FLUID_SLOT))
+                .widget(new ButtonWidget(152, 24, 16, 16,
+                        new GuiTextureGroup(GuiTextures.BUTTON, GuiTextures.LIGHT_ON), this::onHudButton)
+                        .setHoverTooltips(
+                                Component.translatable("gtna.machine.wireless_steam.hud.toggle"),
+                                Component.translatable("gtna.machine.wireless_steam.hud.editor")))
                 .widget(UITemplate.bindPlayerInventory(entityPlayer.getInventory(),
                         GuiTextures.SLOT_STEAM.get(isSteel), 7, 84, true));
+    }
+
+    /**
+     * The HUD button on the wireless steam hatch (GTOCore's WirelessEnergySubstation parity): left
+     * click toggles the HUD, right click opens the editor to drag it. Runs client-side only; the
+     * actual work goes through {@link WirelessSteamHudBridge} so this common class never references
+     * a client class.
+     */
+    private void onHudButton(ClickData clickData) {
+        if (!clickData.isRemote) return;
+        if (clickData.button == 1) {
+            WirelessSteamHudBridge.openEditor.run();
+        } else {
+            WirelessSteamHudBridge.toggleHud.run();
+        }
     }
 }

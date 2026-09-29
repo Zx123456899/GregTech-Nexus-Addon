@@ -9,9 +9,14 @@ import net.minecraftforge.network.simple.SimpleChannel;
 
 import com.raishxn.gtna.GTNACORE;
 import com.raishxn.gtna.network.packet.CLocateConnectionPacket;
+import com.raishxn.gtna.network.packet.CStructureRefreshPacket;
+import com.raishxn.gtna.network.packet.SKubeModuleDescriptions;
+import com.raishxn.gtna.network.packet.SModuleCountPacket;
 import com.raishxn.gtna.network.packet.SRegionHighlightPacket;
 import com.raishxn.gtna.network.packet.SStructureDetectHighlight;
 import com.raishxn.gtna.network.packet.SStructureGhostPreviewPacket;
+import com.raishxn.gtna.network.packet.SWirelessEnergyStats;
+import com.raishxn.gtna.network.packet.SWirelessSteamStats;
 
 public class GTNANetworkHandler {
 
@@ -31,6 +36,11 @@ public class GTNANetworkHandler {
     private static int packetId = 0;
 
     public static void init() {
+        CHANNEL.messageBuilder(SKubeModuleDescriptions.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SKubeModuleDescriptions::encode)
+                .decoder(SKubeModuleDescriptions::decode)
+                .consumerMainThread(SKubeModuleDescriptions::handle)
+                .add();
         // S2C – Server highlights a block on the client
         CHANNEL.messageBuilder(SStructureDetectHighlight.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SStructureDetectHighlight::encode)
@@ -44,10 +54,30 @@ public class GTNANetworkHandler {
                 .consumerMainThread(SRegionHighlightPacket::handle)
                 .add();
 
+        // S2C – formed auxiliary-module count for the machine-mode switcher
+        CHANNEL.messageBuilder(SModuleCountPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SModuleCountPacket::encode)
+                .decoder(SModuleCountPacket::decode)
+                .consumerMainThread(SModuleCountPacket::handle)
+                .add();
+
         CHANNEL.messageBuilder(SStructureGhostPreviewPacket.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(SStructureGhostPreviewPacket::encode)
                 .decoder(SStructureGhostPreviewPacket::decode)
                 .consumerMainThread(SStructureGhostPreviewPacket::handle)
+                .add();
+
+        // S2C – periodic wireless steam network snapshot for the HUD
+        CHANNEL.messageBuilder(SWirelessSteamStats.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SWirelessSteamStats::encode)
+                .decoder(SWirelessSteamStats::decode)
+                .consumerMainThread(SWirelessSteamStats::handle)
+                .add();
+
+        CHANNEL.messageBuilder(SWirelessEnergyStats.class, packetId++, NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(SWirelessEnergyStats::encode)
+                .decoder(SWirelessEnergyStats::decode)
+                .consumerMainThread(SWirelessEnergyStats::handle)
                 .add();
 
         // C2S – Client requests a locate highlight
@@ -55,6 +85,12 @@ public class GTNANetworkHandler {
                 .encoder(CLocateConnectionPacket::encode)
                 .decoder(CLocateConnectionPacket::decode)
                 .consumerMainThread(CLocateConnectionPacket::handle)
+                .add();
+
+        CHANNEL.messageBuilder(CStructureRefreshPacket.class, packetId++, NetworkDirection.PLAY_TO_SERVER)
+                .encoder(CStructureRefreshPacket::encode)
+                .decoder(CStructureRefreshPacket::decode)
+                .consumerMainThread(CStructureRefreshPacket::handle)
                 .add();
     }
 

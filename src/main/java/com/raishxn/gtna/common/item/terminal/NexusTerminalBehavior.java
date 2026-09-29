@@ -4,7 +4,7 @@ import com.gregtechceu.gtceu.api.item.component.IAddInformation;
 import com.gregtechceu.gtceu.api.item.component.IItemUIFactory;
 import com.gregtechceu.gtceu.api.machine.MetaMachine;
 import com.gregtechceu.gtceu.api.machine.feature.multiblock.IMultiController;
-import com.gregtechceu.gtceu.api.machine.multiblock.WorkableMultiblockMachine;
+import com.gregtechceu.gtceu.api.machine.multiblock.MultiblockControllerMachine;
 
 import com.lowdragmc.lowdraglib.gui.factory.HeldItemUIFactory;
 import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
@@ -26,7 +26,12 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraftforge.api.distmarker.Dist;
+import net.minecraftforge.fml.DistExecutor;
 
+import com.raishxn.gtna.GTNACORE;
+import com.raishxn.gtna.api.machine.multiblock.GTNAStructureRefresh;
+import com.raishxn.gtna.client.ClientPlayerLookup;
 import com.raishxn.gtna.common.item.terminal.ui.NexusTerminalUIFactory;
 import com.raishxn.gtna.integration.ae2.NexusAE2Link;
 import org.jetbrains.annotations.Nullable;
@@ -79,22 +84,27 @@ public class NexusTerminalBehavior implements IItemUIFactory, IAddInformation {
             }
         }
 
-        // ── Shift+Click on controller: auto-build / replace ───────────────────
+        // ── Shift+Click on controller: auto-build / replace / build module ────
         if (player.isShiftKeyDown()) {
             if (MetaMachine.getMachine(level, blockPos) instanceof IMultiController controller) {
-                if (!controller.isFormed()) {
+                NexusTerminalUIFactory.AutoBuildSetting setting = NexusTerminalUIFactory.AutoBuildSetting
+                        .getSetting(terminalStack);
+                // Build when the controller is unformed, when replace mode is on, or when a module
+                // build is requested (the module must be addable to an already-formed multiblock).
+                boolean buildModule = setting.getModuleBuild() > 0;
+                if (!controller.isFormed() || buildModule || setting.isReplaceMode()) {
                     if (!level.isClientSide()) {
+                        long started = System.nanoTime();
                         NexusAutoBuilder.autoBuild(player, controller, terminalStack);
+                        if (controller instanceof MultiblockControllerMachine multiblockController) {
+                            GTNAStructureRefresh.refresh(multiblockController, true);
+                        }
+                        GTNACORE.LOGGER.info("Nexus Terminal built {} in {} ms",
+                                controller.self().getDefinition().getId(),
+                                java.util.concurrent.TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started));
                     }
                     return InteractionResult.sidedSuccess(level.isClientSide);
-                } else if (controller instanceof WorkableMultiblockMachine workableMultiblockMachine &&
-                        NexusTerminalUIFactory.AutoBuildSetting.getSetting(terminalStack).isReplaceMode()) {
-                            if (!level.isClientSide()) {
-                                NexusAutoBuilder.autoBuild(player, controller, terminalStack);
-                                workableMultiblockMachine.onPartUnload();
-                            }
-                            return InteractionResult.sidedSuccess(level.isClientSide);
-                        }
+                }
             }
         }
         return InteractionResult.PASS;
@@ -154,7 +164,10 @@ public class NexusTerminalBehavior implements IItemUIFactory, IAddInformation {
      * Append range status tooltip. Separated to safely reference client-side player.
      */
     private void appendAE2RangeTooltip(ItemStack stack, Level level, List<Component> tooltipComponents) {
-        Player localPlayer = net.minecraft.client.Minecraft.getInstance().player;
+        // Routed through a client-only helper: referencing Minecraft/LocalPlayer from this common
+        // class made a dedicated server reject the class while verifying it, and the mod failed to
+        // load. unsafeCallWhenOn returns null on the server.
+        Player localPlayer = DistExecutor.unsafeCallWhenOn(Dist.CLIENT, () -> ClientPlayerLookup::localPlayer);
         if (localPlayer == null) return;
 
         if (NexusAE2Link.isInRange(stack, level, localPlayer)) {

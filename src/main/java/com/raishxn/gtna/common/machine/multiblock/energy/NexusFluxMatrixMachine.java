@@ -8,7 +8,9 @@ import com.gregtechceu.gtceu.api.machine.feature.multiblock.IDisplayUIMachine;
 import com.gregtechceu.gtceu.api.machine.multiblock.WorkableMultiblockMachine;
 
 import com.lowdragmc.lowdraglib.gui.modular.ModularUI;
+import com.lowdragmc.lowdraglib.gui.texture.GuiTextureGroup;
 import com.lowdragmc.lowdraglib.gui.util.ClickData;
+import com.lowdragmc.lowdraglib.gui.widget.ButtonWidget;
 import com.lowdragmc.lowdraglib.gui.widget.ComponentPanelWidget;
 import com.lowdragmc.lowdraglib.gui.widget.DraggableScrollableWidgetGroup;
 import com.lowdragmc.lowdraglib.gui.widget.LabelWidget;
@@ -22,7 +24,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.block.state.BlockState;
 
+import com.raishxn.gtna.client.hud.WirelessEnergyHudBridge;
 import com.raishxn.gtna.client.renderer.BlockHighlightHandler;
+import com.raishxn.gtna.client.renderer.GTNATextures;
 import com.raishxn.gtna.common.block.NexusCapacitorBlock;
 import com.raishxn.gtna.common.data.NexusEnergyNetwork;
 import com.raishxn.gtna.config.ConfigHolder;
@@ -173,6 +177,15 @@ public class NexusFluxMatrixMachine extends WorkableMultiblockMachine implements
         return new ModularUI(310, 270, this, entityPlayer)
                 .background(GuiTextures.BACKGROUND)
                 .widget(screen)
+                .widget(new ButtonWidget(285, 6, 16, 16,
+                        new GuiTextureGroup(GuiTextures.BUTTON, GuiTextures.LIGHT_ON), click -> {
+                            if (!click.isRemote) return;
+                            if (click.button == 1) WirelessEnergyHudBridge.openEditor.run();
+                            else WirelessEnergyHudBridge.toggleHud.run();
+                        }).setHoverTooltips(Component.translatable("gtna.machine.wireless_energy.hud.toggle"),
+                                Component.translatable("gtna.machine.wireless_energy.hud.editor")))
+                // The addon logo in the bottom-right corner of the content area (GTNL convention).
+                .widget(GTNATextures.logo(281, 161))
                 .widget(UITemplate.bindPlayerInventory(entityPlayer.getInventory(), GuiTextures.SLOT, 74, 188, true));
     }
 
@@ -220,11 +233,10 @@ public class NexusFluxMatrixMachine extends WorkableMultiblockMachine implements
         NexusEnergyNetwork network = NexusEnergyNetwork.get(serverLevel);
         Int128 energy = network.getEnergy(getOwnerUUID());
         Int128 maxCap = maxCapacity;
-        boolean safeMode = network.getSafeMode(getOwnerUUID());
         Int128 inPerTick = network.getLastInputPerTick(getOwnerUUID());
         Int128 outPerTick = network.getLastOutputPerTick(getOwnerUUID());
 
-        textList.add(Component.literal("\u00a77Status: " + (safeMode ? "\u00a7cSAFE MODE" : "\u00a7aONLINE")));
+        textList.add(Component.literal("\u00a77Status: \u00a7aONLINE"));
 
         double fill = 0.0;
         if (!maxCap.isZero()) {

@@ -197,9 +197,9 @@ public class EyeOfHarmonyMachine extends WorkableMultiblockMachine implements ID
                     WirelessEnergyManager.getEnergy(serverLevel, networkOwner) : Int128.ZERO();
             textList.add(Component.translatable("gtna.machine.eye_of_harmony.owner", ownerName));
             textList.add(Component.translatable("gtna.machine.eye_of_harmony.network_eu",
-                    stored.toFormattedString()));
+                    FormattingUtil.formatNumbers(stored.toString())));
             textList.add(Component.translatable("gtna.machine.eye_of_harmony.startup_eu",
-                    getStartupEnergy().toFormattedString()));
+                    FormattingUtil.formatNumbers(getStartupEnergy().toString())));
             textList.add(Component.translatable("gtna.machine.eye_of_harmony.hydrogen",
                     FormattingUtil.formatNumbers(hydrogen)));
             textList.add(Component.translatable("gtna.machine.eye_of_harmony.helium",

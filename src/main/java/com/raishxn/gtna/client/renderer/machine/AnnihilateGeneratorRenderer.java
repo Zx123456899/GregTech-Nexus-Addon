@@ -1,6 +1,7 @@
 package com.raishxn.gtna.client.renderer.machine;
 
 import com.gregtechceu.gtceu.client.renderer.machine.DynamicRender;
+import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderManager;
 import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderType;
 
 import net.minecraft.client.Minecraft;
@@ -24,8 +25,8 @@ import org.joml.Quaternionf;
 public class AnnihilateGeneratorRenderer extends DynamicRender<ArtificialStarMachine, AnnihilateGeneratorRenderer> {
 
     public static final Codec<AnnihilateGeneratorRenderer> CODEC = Codec.unit(AnnihilateGeneratorRenderer::new);
-    public static final DynamicRenderType<ArtificialStarMachine, AnnihilateGeneratorRenderer> TYPE =
-            new DynamicRenderType<>(CODEC);
+    public static final DynamicRenderType<ArtificialStarMachine, AnnihilateGeneratorRenderer> TYPE = DynamicRenderManager
+            .register(GTNACORE.id("annihilate_generator/star"), new DynamicRenderType<>(CODEC));
 
     private static final ResourceLocation STAR_MODEL = GTNACORE.id("obj/star");
 

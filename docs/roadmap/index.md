@@ -13,7 +13,7 @@ Acompanhe o progresso de desenvolvimento do GregTech Nexus Addon em tempo real.
 - [x] **Large Steam Furnace** — 9x velocidade, 128 paralelos, 50% eficiência
 - [x] **Large Steam Crusher** — Triturador em massa a vapor
 - [x] **Large Steam Alloy Smelter** — 64 paralelos, 43% mais rápido
-- [x] **Mega Solar Boiler** — Vapor infinito via Sol (10,000 L/s por célula)
+- [x] **Large Steam Solar Boiler** — Vapor infinito via Sol (10,000 L/s por célula)
 - [x] **Steam Cobbler** — Gerador de pedra, 16 paralelos
 - [x] **Stone Superheater** — Derrete pedra em fluidos, 32 paralelos
 - [x] **Steam Manufacturer** — Assembler hidráulico a vapor
@@ -63,8 +63,6 @@ Acompanhe o progresso de desenvolvimento do GregTech Nexus Addon em tempo real.
 - [ ] **Wireless Transmitter Cover** — Para geradores singleblock
 - [ ] **Nexus Linker** — Item de vinculação (Shift+Click Controller → Click Hatch)
 - [ ] **Quantum Network Terminal** — GUI de monitoramento completo
-- [ ] **Safe Mode** — Proteção auto. em <10% → desliga output → reativa em 25%
-- [ ] **Alertas de bateria** — Chat msgs em 75%, 50%, 25%, <10%
 - [ ] **Cross-dimension** — Suporte inter-dimensional (ZPM+)
 - [ ] **Escalabilidade Quadrática** — `Capacity × Count / 2` com Int128
 - [ ] PRD completo: [prd_05_nexus_flux_matrix.md](../prd/prd_05_nexus_flux_matrix.md)
@@ -77,15 +75,90 @@ Acompanhe o progresso de desenvolvimento do GregTech Nexus Addon em tempo real.
 - [ ] **Steam Distillation Column** — Destilação a vapor
 - [ ] **Hydraulic Press Complex** — Bender+Compressor+Hammer+Press+Extruder
 
-### Pattern Buffer System
+### Pattern Buffer System ✅ **Implementado** (multi-modo funcional)
 
-- [ ] Pattern Buffer MK-I (4 slots) — MV
-- [ ] Pattern Buffer MK-II (9 slots) — HV
-- [ ] Pattern Buffer MK-III (16 slots) — EV
-- [ ] Pattern Buffer MK-IV (36 slots) — IV
-- [ ] Pattern Buffer MK-V (64 slots) — LuV
-- [ ] GUI completa com configuração por slot
-- [ ] Integração AE2
+- [x] **ME Mini Pattern Buffer** (9 slots) — LuV
+- [x] **ME Pattern Buffer** (21 slots) — ZPM
+- [x] **ME Advanced Pattern Buffer** (32 slots) — UV
+- [x] **ME Ultimate Pattern Buffer** (72 slots) — UHV
+- [x] GUI completa com configuração por slot (item/fluido/circuito/modo) — página de duas colunas
+      (`352x248`): grade de patterns à esquerda e painel de configuração do slot **docado** à
+      direita, mais o side tab **Buffer Tools** (cache de receitas + ferramentas de circuito dos
+      patterns). Geometria centralizada em `PatternBufferLayout` e guardada pelo unit test
+      `PatternBufferLayoutTest`.
+- [x] Integração AE2 (pattern push/pull via rede ME)
+- [x] **Troca automática de modo do multibloco** conforme o recipe type do pattern
+      (espelho de `activeRecipeType` com a fórmula oficial do GTM — ver
+      [auditoria técnica](technical-audit-pattern-buffer.md)). **Coberto por gametest end-to-end**
+      desde 2026-09-20: um `duration_tester` formado que roda uma receita do segundo tipo vira o
+      modo sozinho (`runningSecondRecipeTypeMirrorsControllerMode`).
+- [x] **Troca automática de modo também em multiblocos do GTCEu/GCYM** (Large Cutter entre cutter
+      e lathe, Multi Smelter entre furnace e alloy smelter, etc.): o pattern buffer dirige o modo
+      quando a máquina está **ociosa**, então nunca interrompe produção. Coberto pelo gametest
+      `patternBufferDrivesBaseMachineMode`; desligável em `ConfigHolder` (`bufferDrivenMachineMode`,
+      ligado por padrão).
+- [x] **Filtro de modo por buffer** — seletor na UI do próprio buffer (paridade com o
+      `MultiMachineModeFancyConfigurator` do GTOCore) que limita o buffer a um recipe type.
+- [x] **Output ME sem perda** — sobra de output vai para um buffer persistido e é drenada por um
+      `IGridTickable` com frequência adaptativa, em vez de ser voidada.
+- [x] Itens de upgrade entre tiers (preservam padrões e configuração)
+- [x] Fidelidade 1:1 com GTOCore/GTLCore — **tabela de gap toda verde**; as divergências restantes
+      são conscientes e documentadas em [gap de fidelidade](pattern-buffer-fidelity-gap.md).
+
+### Estabilização após reviews externas (2026-09-20)
+
+- [x] **BUG-EXT-001 — isolamento do executor AE2**: CPUs AE2 nativas mantêm o
+      `CraftingCpuLogic` original; apenas a CPU virtual do Nexus recebe o executor otimizado.
+      Protegido pelo GameTest `nativeCraftingCpuKeepsAe2Executor`.
+- [ ] **BUG-EXT-001 — reprodução manual**: testar autocrafting com uma CPU AE2 comum e uma CPU
+      virtual Nexus em uma rede real para confirmar se o travamento reportado desapareceu.
+- [x] **BUG-EXT-002 — restauração da armadura Quantum**: velocidade de voo, `mayfly`, estado de
+      voo, altura de passo e efeito de movimento são restaurados ao remover a armadura.
+- [ ] **BUG-EXT-002 — teste interativo**: equipar/remover o set e os boots, incluindo troca entre
+      survival/creative, e conferir a visibilidade em `NORMAL` e `JOURNEY`.
+- [ ] **Visibilidade/documentação**: esclarecer na configuração que a armadura é restrita e fica
+      fora da creative tab por padrão em `NORMAL`.
+- [ ] Detalhes, evidências e comandos de validação: [Continuity Ledger](../../CONTINUITY_LEDGER.md).
+
+### Correção de wiring + primeira camada de QA (2026-09-21)
+
+- [x] **Wireless Steam Input Hatch aceito nas máquinas steam**: os patterns fixavam o slot de vapor
+      no bloco exato do hatch do GTCEu; agora usam a ability (`abilities(PartAbility.STEAM)`), como as
+      máquinas steam do próprio GTCEu. O hatch de saída deixou de declarar `STEAM`.
+- [x] **Guards novos**: `SteamWiringContractTest` (lint de fonte, 10º unit test) + GameTest
+      `wirelessSteamHatchIsAcceptedAsSteamSource` (7º gametest), ambos validados por teste negativo.
+- [ ] **QA em camadas**: replicar o gametest para as demais máquinas steam; mais lints de
+      registro/wiring; CI com determinismo de `runData`. Ver G-0011 no
+      [Continuity Ledger](../../CONTINUITY_LEDGER.md).
+- [x] **Thread Hatch (G-0012)**: doc alinhada à realidade (só a base
+      `WorkableElectricMultipleRecipesMachine`; hoje o Duration Tester + KubeJS) e gametest
+      `threadHatchWiresIntoMultipleRecipesMachine` travando a fundação.
+- [ ] **Fase 2 do manifest — migração dos controladores** para a base multi-receita, para que a
+      Thread Hatch seja usável em máquina de gameplay (regra 8 do
+      [manifest de port](multiblock-port-manifest.md)).
+
+### Paridade GTO nos hatches (2026-09-21)
+
+- [x] **Accelerate sem punir**: a penalidade passou a seguir o tier **pré-overclock da receita**
+      (igual ao GTOCore), não o tier da máquina; função pura + unit test.
+- [x] **Quantidade configurável** nas hatches Accelerate, Overclock e Thread (base
+      `ConfigurableAmountPartMachine`, UI `IntInputWidget`), como o
+      `WorkableAmountConfigurationPartMachine` do GTO.
+- [x] **Tooltips no padrão GTO**, explicando o efeito, a regra de penalidade e a quantidade ajustável.
+- [x] **Teste de runtime do Output Boost** (gametest completa uma receita e afirma `M`, não `M²`),
+      validado por teste negativo.
+- [ ] Conferir in-game o visual das novas UIs e traduzir as chaves novas no `pt_br.json`.
+- [ ] **Fase 2 do manifest** continua pendente para a Thread Hatch ser usável em máquina de gameplay.
+
+### Port de multiblocos do GTLsupb (2026-09-21)
+
+- [x] **Universal Factory** (`gtna:universal_factory`): 32 recipe types, cross-recipe parallel +
+      threads (engine do GTNA), warmup/overload/batch com UI, casing novo. Base de teste para a
+      lógica multi-receita.
+- [x] **Primitive Stone Furnace** (`gtna:primitive_stone_furnace`): fornalha multibloco **sem
+      energia** (FURNACE_RECIPES), padrão 3×3×3 de pedra.
+- [ ] Textura dedicada do casing, traduções `pt_br.json` e conferência in-game dos displays.
+- [ ] Detalhes, licença (LGPLv3) e evidências: [Continuity Ledger](../../CONTINUITY_LEDGER.md) G-0015.
 
 ### Novos Elementos
 
@@ -110,9 +183,9 @@ Acompanhe o progresso de desenvolvimento do GregTech Nexus Addon em tempo real.
 
 ### KubeJS Integration
 
-- [ ] Plugin KubeJS registrado
-- [ ] GTNAPartAbility exposto para scripts
-- [ ] WorkableElectricMultipleRecipesMachine via KubeJS
+- [x] Plugin KubeJS registrado (`GTNAKubeJSPlugin`)
+- [x] GTNAPartAbility exposto para scripts
+- [x] WorkableElectricMultipleRecipesMachine via KubeJS (`gtna:multiple_recipes`)
 - [ ] Documentação e exemplos completos
 - [ ] Script de teste validado
 
@@ -144,9 +217,19 @@ Acompanhe o progresso de desenvolvimento do GregTech Nexus Addon em tempo real.
 ### Infraestrutura
 
 - [ ] Wiki completa (MkDocs + GitHub Pages)
-- [ ] Automated testing
-- [ ] CI/CD pipeline
+- [x] **Automated testing** — 6 unit tests (`main()` + asserts, padrão GTLCore) e **4 gametests**
+      (`@GameTest` em servidor dedicado real), todos no gate do CI.
+- [x] **CI/CD pipeline** — `gradle.yml` roda `build`, `spotlessCheck`, `runUnitTests` e
+      `runGameTestServer` (com guarda do banner `GAME TESTS COMPLETE`); `docs.yml` publica o MkDocs.
 - [ ] Community playtest program
+
+!!! tip "Auditoria Técnica"
+    A auditoria estrutural completa do mod (pacotes, registries, mixins, testes, CI) + o plano de execução detalhado do **pattern buffer multi-modo** estão em [`technical-audit-pattern-buffer.md`](technical-audit-pattern-buffer.md). O escopo mecânico do port GTOCore/GTLAdditions segue em [`multiblock-port-manifest.md`](multiblock-port-manifest.md).
+
+!!! info "Retomar o trabalho numa sessão nova"
+    O estado atual, as pendências priorizadas e as **notas de campo** (os erros já pagos, para não
+    redescobrir) ficam no `CONTINUITY_LEDGER.md`, na raiz do repositório. Comece por lá: ele diz o
+    que está verde, o que falta e quais comandos rodar antes de mexer em qualquer coisa.
 
 ---
 

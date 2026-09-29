@@ -65,6 +65,55 @@ public class MaterialBuilder {
                         GENERATE_DOUBLE_PLATE, GENERATE_TRIPLE_PLATE)
                 .buildAndRegister().setFormula("Al(CuSn)3");
 
+        EglinSteel = new Material.Builder(GTNACORE.id("eglin_steel"))
+                .ingot().fluid()
+                .blastTemp(1048, LOW)
+                .components(Iron, 4, Kanthal, 1, Invar, 5, Sulfur, 1, Silicon, 1, Carbon, 1)
+                .color(0x4e270b)
+                .iconSet(METALLIC)
+                .flags(GENERATE_PLATE, GENERATE_GEAR, DISABLE_DECOMPOSITION)
+                .buildAndRegister();
+
+        RawBrine = new Material.Builder(GTNACORE.id("raw_brine"))
+                .fluid()
+                .color(0x9f6b26)
+                .buildAndRegister();
+
+        HotBrine = new Material.Builder(GTNACORE.id("hot_brine"))
+                .liquid(320).color(0xbe6026).buildAndRegister();
+        HotDebrominatedBrine = new Material.Builder(GTNACORE.id("hot_debrominated_brine"))
+                .liquid(320).color(0xab896d).buildAndRegister();
+        HotChlorinatedBrominatedBrine = new Material.Builder(GTNACORE.id("hot_chlorinated_brominated_brine"))
+                .liquid(320).color(0xab765d)
+                .components(HotBrine, 1, Chlorine, 1)
+                .flags(DISABLE_DECOMPOSITION).buildAndRegister();
+        HotAlkalineDebrominatedBrine = new Material.Builder(GTNACORE.id("hot_alkaline_debrominated_brine"))
+                .liquid(320).color(0xbe8938)
+                .components(HotDebrominatedBrine, 2, Chlorine, 1)
+                .flags(DISABLE_DECOMPOSITION).buildAndRegister();
+        DebrominatedBrine = new Material.Builder(GTNACORE.id("debrominated_brine"))
+                .liquid().color(0xab8c6d).buildAndRegister();
+        BrominatedChlorineVapor = new Material.Builder(GTNACORE.id("brominated_chlorine_vapor"))
+                .gas().color(0xbb9b72)
+                .components(Chlorine, 1, Bromine, 1, Steam, 1)
+                .flags(DISABLE_DECOMPOSITION).buildAndRegister();
+        AcidicBromineSolution = new Material.Builder(GTNACORE.id("acidic_bromine_solution"))
+                .liquid().color(0xc49b52)
+                .components(Chlorine, 1, Bromine, 1)
+                .flags(DISABLE_DECOMPOSITION).buildAndRegister();
+        ConcentratedBromineSolution = new Material.Builder(GTNACORE.id("concentrated_bromine_solution"))
+                .liquid().color(0x91481e)
+                .components(Bromine, 2, Chlorine, 1)
+                .flags(DISABLE_DECOMPOSITION).buildAndRegister();
+        AcidicBromineExhaust = new Material.Builder(GTNACORE.id("acidic_bromine_exhaust"))
+                .gas().color(0x8f681e)
+                .components(Steam, 3, Chlorine, 1)
+                .buildAndRegister();
+        HydrogenIodide = new Material.Builder(GTNACORE.id("hydrogen_iodide"))
+                .gas().color(0x8187a6)
+                .components(Hydrogen, 1, Iodine, 1)
+                .flags(DISABLE_DECOMPOSITION).buildAndRegister();
+
         DarkSteel = new Material.Builder(GTNACORE.id("dark_steel"))
                 .ingot().fluid()
                 .color(0x414751)
@@ -117,6 +166,38 @@ public class MaterialBuilder {
                 .flags(GENERATE_FRAME, GENERATE_GEAR, GENERATE_PLATE, GENERATE_DOUBLE_PLATE,
                         DISABLE_DECOMPOSITION)
                 .buildAndRegister().setFormula("Nb2Cr9Al5Ti2Co10W13Ni18");
+
+        // GTOCore Inconel-625 / Inconel-792 / Tantalloy-61, copied 1:1 (components, colour, icon set,
+        // blast stats and flags) because the ISA Mill casings and the ISA Mill Assembly Line
+        // controller recipe use them. Alloy-blast, EBF and mixer routes are the GTCEu automatic ones.
+        Inconel625 = new Material.Builder(GTNACORE.id("inconel_625"))
+                .ingot().fluid()
+                .color(0x00CD66)
+                .blastTemp(4850, BlastProperty.GasTier.HIGH, GTValues.VA[GTValues.IV])
+                .components(Nickel, 8, Chromium, 6, Molybdenum, 4, Niobium, 4, Titanium, 3, Iron, 2,
+                        Aluminium, 2)
+                .iconSet(METALLIC)
+                .flags(DISABLE_DECOMPOSITION, GENERATE_PLATE, GENERATE_GEAR, GENERATE_SMALL_GEAR,
+                        GENERATE_BOLT_SCREW)
+                .buildAndRegister();
+
+        Inconel792 = new Material.Builder(GTNACORE.id("inconel_792"))
+                .ingot().fluid()
+                .blastTemp(5200, BlastProperty.GasTier.HIGH)
+                .components(Nickel, 2, Niobium, 1, Aluminium, 2, Nichrome, 1)
+                .color(0x44974A)
+                .iconSet(METALLIC)
+                .flags(GENERATE_BOLT_SCREW, GENERATE_FRAME, GENERATE_GEAR, DISABLE_DECOMPOSITION)
+                .buildAndRegister();
+
+        Tantalloy61 = new Material.Builder(GTNACORE.id("tantalloy_61"))
+                .ingot().fluid()
+                .blastTemp(6900, BlastProperty.GasTier.HIGHER, GTValues.VA[GTValues.IV], 500)
+                .components(Tantalum, 13, Tungsten, 12, Titanium, 6, Yttrium, 4)
+                .color(0x363636)
+                .iconSet(METALLIC)
+                .flags(GENERATE_BOLT_SCREW, DISABLE_DECOMPOSITION)
+                .buildAndRegister();
 
         FallKing = new Material.Builder(GTNACORE.id("fall_king"))
                 .ingot().fluid()
@@ -242,6 +323,142 @@ public class MaterialBuilder {
                 .color(0xFFFFFF)
                 .iconSet(RADIOACTIVE)
                 .flags(DISABLE_DECOMPOSITION)
+                .buildAndRegister();
+
+        // ------------------------------------------------------------------------------------
+        // GTOCore Industrial Flotation Cell / Vacuum Drying Furnace pair (G-0107/G-0108).
+        // Material definitions copied 1:1 from GTO's MaterialA/MaterialB (components, colour, icon
+        // set, flags and formula) so the ported recipes keep the original reagents and products.
+        // ------------------------------------------------------------------------------------
+
+        // GTOCore alloy additions used by the Hastelloy-N75 casing family and the flotation
+        // controller recipe (GTO MaterialA:693 and MaterialA:1060).
+        HastelloyN75 = new Material.Builder(GTNACORE.id("hastelloy_n_75"))
+                .ingot().fluid()
+                .color(0x8b6914)
+                .blastTemp(4550, BlastProperty.GasTier.HIGH, GTValues.VA[GTValues.EV])
+                .components(Nickel, 15, Molybdenum, 9, Chromium, 4, Titanium, 2, Erbium, 2)
+                .iconSet(METALLIC)
+                .flags(DISABLE_DECOMPOSITION, GENERATE_BOLT_SCREW, GENERATE_GEAR, GENERATE_SMALL_GEAR,
+                        GENERATE_PLATE)
+                .buildAndRegister();
+
+        Stellite = new Material.Builder(GTNACORE.id("stellite"))
+                .ingot().fluid()
+                .blastTemp(4310, BlastProperty.GasTier.HIGH, 1920)
+                .components(Cobalt, 9, Chromium, 9, Manganese, 5, Titanium, 2)
+                .color(0x888192)
+                .iconSet(METALLIC)
+                .flags(GENERATE_GEAR, DISABLE_DECOMPOSITION, GENERATE_FOIL, GENERATE_PLATE)
+                .buildAndRegister();
+
+        // GTOCore flotation reagents (GTO MaterialB:2776, :2784, :2952).
+        SodiumEthylxanthate = new Material.Builder(GTNACORE.id("sodium_ethylxanthate"))
+                .dust()
+                .color(0xcdad00)
+                .components(Carbon, 3, Hydrogen, 5, Sodium, 1, Oxygen, 1, Sulfur, 2)
+                .flags(DISABLE_DECOMPOSITION)
+                .iconSet(DULL)
+                .buildAndRegister();
+
+        PotassiumEthylxanthate = new Material.Builder(GTNACORE.id("potassium_ethylxanthate"))
+                .dust()
+                .color(0xcdc8b1)
+                .components(Carbon, 3, Hydrogen, 5, Potassium, 1, Oxygen, 1, Sulfur, 2)
+                .flags(DISABLE_DECOMPOSITION)
+                .iconSet(DULL)
+                .buildAndRegister();
+
+        Turpentine = new Material.Builder(GTNACORE.id("turpentine"))
+                .fluid()
+                .components(Carbon, 10, Hydrogen, 16)
+                .color(0x9acd32)
+                .flags(DISABLE_DECOMPOSITION)
+                .iconSet(FLUID)
+                .buildAndRegister();
+
+        // GTOCore ore foams (GTO MaterialB:2974-3070); every one has a drying consumer.
+        PyropeFront = oreFront("pyrope_front", Pyrope, 0x8b0000);
+        RedstoneFront = oreFront("redstone_front", Redstone, 0xee0000);
+        ChalcopyriteFront = oreFront("chalcopyrite_front", Chalcopyrite, 0xcdaa7d);
+        MonaziteFront = oreFront("monazite_front", Monazite, 0x838b83);
+        EnrichedNaquadahFront = oreFront("enriched_naquadah_front", NaquadahEnriched, 0x58d00f);
+        GrossularFront = oreFront("grossular_front", Grossular, 0xd2691e);
+        NickelFront = oreFront("nickel_front", Nickel, 0xc1cdcd);
+        AlmandineFront = oreFront("almandine_front", Almandine, 0xb22222);
+        PlatinumFront = oreFront("platinum_front", Platinum, 0xcdc9a5);
+        PentlanditeFront = oreFront("pentlandite_front", Pentlandite, 0xcdaa7d);
+        SpessartineFront = oreFront("spessartine_front", Spessartine, 0xee5c42);
+        SphaleriteFront = oreFront("sphalerite_front", Sphalerite, 0xeee9e9);
+
+        // GTOCore drying by-products (GTO MaterialB:4023, :4028). GTO uses its own LIMPID icon
+        // set, which GTCEu does not have; GTNA substitutes the regular FLUID icon set.
+        RedMud = new Material.Builder(GTNACORE.id("red_mud"))
+                .fluid()
+                .color(0x972903).iconSet(FLUID)
+                .buildAndRegister().setFormula("HCl?", false);
+
+        NeutralisedRedMud = new Material.Builder(GTNACORE.id("neutralised_red_mud"))
+                .fluid()
+                .color(0x972903).iconSet(FLUID)
+                .buildAndRegister().setFormula("Fe??", false);
+
+        // GTOCore CarbonFiberPolyphenyleneSulfideComposite (GTO MaterialComposite:179): the
+        // Component Assembler extension frame. Copied 1:1 apart from GTO's CURVED_PLATE and
+        // COMPOSITE_MATERIAL flags, which GTNA does not implement.
+        CarbonFiberPolyphenyleneSulfideComposite = new Material.Builder(
+                GTNACORE.id("carbon_fiber_polyphenylene_sulfide_composite"))
+                .ingot().fluid()
+                .color(0x24221d).secondaryColor(0x171614)
+                .blastTemp(4480, BlastProperty.GasTier.HIGH, GTValues.VA[GTValues.IV], 600)
+                .iconSet(BRIGHT)
+                .flags(GENERATE_PLATE, GENERATE_LONG_ROD, GENERATE_FRAME)
+                .buildAndRegister();
+
+        // GTOCore TitaniumNitrideCeramic (GTO MaterialB:4980). GTO's GENERATE_CERAMIC/MXene flags do
+        // not exist in GTNA; GENERATE_BRICK is the flag that makes the flake items this casing needs.
+        TitaniumNitrideCeramic = new Material.Builder(GTNACORE.id("titanium_nitride_ceramic"))
+                .dust()
+                .color(0xd4ac4b).secondaryColor(0x9c7a34)
+                .iconSet(BRIGHT)
+                .flags(GENERATE_BRICK)
+                .buildAndRegister().setFormula("TiN");
+
+        BoronCarbide = new Material.Builder(GTNACORE.id("boron_carbide"))
+                .dust()
+                .color(0x1e1e1e)
+                .iconSet(DULL)
+                .components(Boron, 4, Carbon, 3)
+                .flags(DISABLE_DECOMPOSITION)
+                .buildAndRegister().setFormula("B4C");
+
+        BoronCarbideCeramics = new Material.Builder(GTNACORE.id("boron_carbide_ceramics"))
+                .dust()
+                .color(0x2b2b31)
+                .iconSet(BRIGHT)
+                .flags(GENERATE_BRICK)
+                .buildAndRegister().setFormula("B4C");
+
+        // GTOCore Tanmolyium (GTO MaterialA): the iridium casing's plate. Copied 1:1; the production
+        // route is GTCEu's automatic component mixer/EBF chain.
+        Tanmolyium = new Material.Builder(GTNACORE.id("tanmolyium"))
+                .ingot().fluid()
+                .blastTemp(4300, BlastProperty.GasTier.HIGH, GTValues.VA[GTValues.EV], 600)
+                .components(Titanium, 5, Molybdenum, 5, Vanadium, 2, Chromium, 3, Aluminium, 1)
+                .color(0x97249a)
+                .iconSet(METALLIC)
+                .flags(DISABLE_DECOMPOSITION, GENERATE_PLATE)
+                .buildAndRegister();
+    }
+
+    /** One GTOCore {@code *Front} ore foam: a limpid fluid carrying one unit of its ore. */
+    private static Material oreFront(String id, Material ore, int color) {
+        return new Material.Builder(GTNACORE.id(id))
+                .fluid()
+                .components(ore, 1)
+                .color(color)
+                .flags(DISABLE_DECOMPOSITION)
+                .iconSet(FLUID)
                 .buildAndRegister();
     }
 }

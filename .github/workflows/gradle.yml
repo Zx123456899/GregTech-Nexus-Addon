@@ -34,13 +34,40 @@ jobs:
       uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
     - name: Build with Gradle Wrapper
-      run: ./gradlew spotlessApply build
-      env:
-        CI: true
+      run: ./gradlew build
 
-    - name: Upload built mod jar
+    - name: Code quality (spotless) + unit tests
+      run: ./gradlew spotlessCheck runUnitTests
+
+    # Generated resources are tracked; if datagen produces a diff the committed en_us/assets are stale.
+    - name: Data generation is deterministic
+      run: |
+        ./gradlew runData
+        if ! git diff --quiet -- src/generated; then
+          echo "::error::runData changed generated resources; run ./gradlew runData and commit the result"
+          git --no-pager diff --stat -- src/generated
+          exit 1
+        fi
+        echo "datagen is deterministic"
+
+    # runGameTestServer exits 0 even when the mod fails to load, so the log banner is the real
+    # assertion. Without this guard a broken build passes silently.
+    - name: Game tests
+      run: |
+        # run/ is gitignored, so CI has to accept the EULA the dedicated server asks for.
+        mkdir -p run
+        echo "eula=true" > run/eula.txt
+        ./gradlew runGameTestServer
+
+    - name: Verify GameTest results and JUnit report
+      run: python3 tools/check_gametest_report.py
+
+    - name: Upload GameTest diagnostics
+      if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: gtna-mod-jar
-        path: build/libs/*.jar
-        if-no-files-found: error
+        name: gametest-results
+        if-no-files-found: warn
+        path: |
+          build/test-results/gametest/TEST-gtna.xml
+          run/logs/latest.log

@@ -20,6 +20,12 @@ sourceSets {
     main.resources {
         srcDir 'src/generated/resources'
     }
+    // GTLCore-style unit tests: plain main()-based classes (no JUnit). They only exercise
+    // pure logic that does not require a Minecraft bootstrap (Int128, NumberUtils,
+    // StructureSlicer, matcher rules; GTRecipe2IntBiMultiMap via a byte-for-byte mirror).
+    test {
+        java.srcDir 'src/test/java'
+    }
 }
 
 repositories {
@@ -49,6 +55,14 @@ repositories {
     maven {
         name 'FirstDarkDev'
         url "https://maven.firstdark.dev/snapshots/"
+    }
+    maven {
+        // Productive Bees (soft dependency; the bee-breeding module only registers when it loads)
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
     }
     maven { // Registrate
         url = "https://maven.tterrag.com/"
@@ -80,6 +94,10 @@ repositories {
     maven {
         url = "https://thedarkcolour.github.io/KotlinForForge/"
     }
+    maven {
+        name = "Team Resourceful"
+        url = "https://maven.teamresourceful.com/repository/maven-public/"
+    }
 
 }
 
@@ -109,11 +127,14 @@ legacyForge {
             // You can set various levels here.
             // Please read: https://stackoverflow.com/questions/2031163/when-to-use-the-different-log-levels
             logLevel = org.slf4j.event.Level.DEBUG
+
+            // Force XWayland (X11) backend on Linux to avoid GLFW 0x1000C crashes under Wayland
+            environment 'XDG_SESSION_TYPE', 'x11'
+            environment 'GDK_BACKEND', 'x11'
         }
         client {
             client()
             sourceSet = sourceSets.main
-            programArguments.addAll('--refresh-dependencies')
             systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
         }
         server {
@@ -121,6 +142,13 @@ legacyForge {
             sourceSet = sourceSets.main
             systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
             programArguments.addAll('--nogui', '--world', 'world-extra')
+        }
+        // Runs every @GameTest in the gtna namespace headlessly, then exits.
+        // Structures live in src/main/resources/data/gtna/structures/*.nbt.
+        gameTestServer {
+            type = "gameTestServer"
+            sourceSet = sourceSets.main
+            systemProperty('forge.enabledGameTestNamespaces', project.mod_id)
         }
         data {
             data()
@@ -149,6 +177,64 @@ jar {
 
 apply from: "$rootDir/gradle/scripts/spotless.gradle"
 
+// Unit tests (GTLCore pattern): each test class exposes `public static void main` and throws
+// AssertionError on failure. We compile them against main's output + compile classpath (which
+// already carries Guava, annotations, etc.) and run every *Test main in sequence.
+tasks.register('runUnitTests') {
+    group = 'verification'
+    description = 'Runs GTLCore-style main()-based unit tests (no Minecraft bootstrap).'
+    dependsOn 'compileJava', 'compileTestJava'
+    def testClasses = [
+            'com.raishxn.gtna.Int128Test',
+            'com.raishxn.gtna.NexusPlannerTest',
+            'com.raishxn.gtna.ModeIdMatcherTest',
+            'com.raishxn.gtna.NumberUtilsTest',
+            'com.raishxn.gtna.StructureSlicerTest',
+            'com.raishxn.gtna.GTRecipe2IntBiMultiMapTest',
+            'com.raishxn.gtna.PatternBufferModeSelectionTest',
+            'com.raishxn.gtna.BufferModeSwitchPolicyTest',
+            'com.raishxn.gtna.ConfigLangKeysTest',
+            'com.raishxn.gtna.JadeLangKeysTest',
+            'com.raishxn.gtna.SteamWiringContractTest',
+            'com.raishxn.gtna.ModuleTooltipContractTest',
+            'com.raishxn.gtna.BuildDependencyContractTest',
+            'com.raishxn.gtna.DataGeneratorMixinContractTest',
+            'com.raishxn.gtna.ProductionMixinTargetContractTest',
+            'com.raishxn.gtna.PartAbilityCoverageTest',
+            'com.raishxn.gtna.RegistrationContractTest',
+            'com.raishxn.gtna.PortLangParityTest',
+            'com.raishxn.gtna.PortChainClosureTest',
+            'com.raishxn.gtna.MachineTooltipContractTest',
+            'com.raishxn.gtna.ControllerRecipePolicyTest',
+            'com.raishxn.gtna.OutputBoostContractTest',
+            'com.raishxn.gtna.AccelerateHatchMathTest',
+            'com.raishxn.gtna.OverclockHatchMathTest',
+            'com.raishxn.gtna.IntegratedOreMathTest',
+            'com.raishxn.gtna.common.machine.multiblock.part.ae.PatternBufferLayoutTest',
+    ]
+    doLast {
+        testClasses.each { String cls ->
+            javaexec {
+                classpath = sourceSets.test.runtimeClasspath
+                mainClass.set(cls)
+            }
+            println "[runUnitTests] ${cls} OK"
+        }
+    }
+}
+
+tasks.register('plannerQa', JavaExec) {
+    group = 'verification'
+    description = 'Measures Nexus Planner p50/p95 latency and plan replay on reproducible graphs.'
+    dependsOn 'compileTestJava'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.raishxn.gtna.planner.benchmark.PlannerBenchmark'
+    args layout.buildDirectory.file('reports/planner/benchmark.csv').get().asFile.absolutePath
+    jvmArgs '-Xms256m', '-Xmx1g'
+}
+
+tasks.named('check').configure { dependsOn 'runUnitTests' }
+
 dependencies {
     def isDataRun = gradle.startParameter.taskNames.any { it.toLowerCase(java.util.Locale.ROOT).contains("rundata") }
 
@@ -156,21 +242,33 @@ dependencies {
     // Mixin
     annotationProcessor('org.spongepowered:mixin:0.8.5:processor')
 
+    // Unit tests: fastutil + Guava for production classes they exercise (NumberUtils uses
+    // LongMath). The test source set does not inherit the Minecraft libraries that normally
+    // provide them; these are the MC 1.20.1 versions.
+    testImplementation("it.unimi.dsi:fastutil:8.5.9")
+    testImplementation("com.google.guava:guava:32.1.2-jre")
+    testImplementation("org.ow2.asm:asm:9.8")
+
     // JEI, EMI, Jade
     modCompileOnly("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     modCompileOnly("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
     modRuntimeOnly("mezz.jei:jei-${minecraft_version}-forge:${jei_version}")
-    modRuntimeOnly("dev.emi:emi-forge:${emi_version}+${minecraft_version}")
     modCompileOnly("curse.maven:jade-324717:5390389")
     if (!isDataRun) {
         modRuntimeOnly("curse.maven:jade-324717:5390389")
+        // Dev-only building/QoL utilities requested by the author. Not required dependencies:
+        // modRuntimeOnly keeps them out of the published mod's manifest.
+        modRuntimeOnly("curse.maven:building-gadgets-298187:6850495")
+        modRuntimeOnly("curse.maven:ftb-chunks-forge-314906:8216874")
+        modRuntimeOnly("curse.maven:ftb-library-forge-404465:8226927")
+        modRuntimeOnly("curse.maven:ftb-teams-forge-404468:7499810")
+        modRuntimeOnly("curse.maven:architectury-api-419699:5137938")
     }
 
     // GregTech and dependencies
     modImplementation("com.gregtechceu.gtceu:gtceu-${minecraft_version}:${gtceu_version}:slim") { transitive = false }
     modImplementation("com.lowdragmc.ldlib:ldlib-forge-${minecraft_version}:${ldlib_version}") { transitive = false }
     modImplementation("com.tterrag.registrate:Registrate:${registrate_version}")
-    modImplementation("dev.toma.configuration:configuration-forge-${minecraft_version}:${configuration_version}")
 
     // lombok
     compileOnly 'org.projectlombok:lombok:1.18.24'
@@ -187,9 +285,28 @@ dependencies {
     modImplementation("curse.maven:configuration-444699:5840405")
 
     // KubeJS soft dependency
-    modCompileOnly("dev.latvian.mods:kubejs-forge:2001.6.5-build.16")
+    modCompileOnly("dev.latvian.mods:kubejs-forge:2001.6.5-build.26")
+    modRuntimeOnly("dev.latvian.mods:kubejs-forge:2001.6.5-build.26")
+    modCompileOnly("dev.latvian.mods:rhino-forge:2001.2.2-build.17")
+    modRuntimeOnly("dev.latvian.mods:rhino-forge:2001.2.2-build.17")
+    modRuntimeOnly("dev.architectury:architectury-forge:9.1.12")
+
+    // Productive Bees soft dependency. The Steam Bee Breeding module is registered only when
+    // Productive Bees is loaded (see GTNAMachines2), so players are never forced to install it; the
+    // dev runs load it so the integration is covered by runData/runGameTestServer.
+    modCompileOnly("maven.modrinth:productivebees:1.20.1-12.6.0")
+    modRuntimeOnly("maven.modrinth:productivebees:1.20.1-12.6.0")
 
     modImplementation("curse.maven:gtceu-terminals-1423461:7787678")
+
+    // Space multiblocks ported from GTLAdditions.
+    runtimeOnly("com.teamresourceful:yabn:1.0.3")
+    runtimeOnly("com.teamresourceful:bytecodecs:1.0.2")
+    modImplementation("com.teamresourceful.resourcefullib:resourcefullib-forge-${minecraft_version}:${resourcefullib_version}")
+    modImplementation("com.teamresourceful.resourcefulconfig:resourcefulconfig-forge-${minecraft_version}:${resourcefulconfig_version}")
+    modImplementation("earth.terrarium.botarium:botarium-forge-${minecraft_version}:${botarium_version}")
+    modImplementation("earth.terrarium.adastra:ad_astra-forge-${minecraft_version}:${ad_astra_version}") { transitive = false }
+    modImplementation("curse.maven:stargate-journey-689083:${stargate_journey_file}") { transitive = false }
 
     modCompileOnly("curse.maven:modern-ui-352491:6956345")
     if (!isDataRun) {
@@ -254,4 +371,19 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = "UTF-8"
     options.release.set(17)
     options.compilerArgs << "-Aquiet=true" // Suppress mixin notes
+}
+
+tasks.withType(JavaExec).configureEach {
+    environment 'XDG_SESSION_TYPE', 'x11'
+    environment 'GDK_BACKEND', 'x11'
+}
+
+tasks.register('installIntegratedOreKubeJSExample', Copy) {
+    description = 'Installs the Integrated Ore Processor KubeJS example in the local dev run.'
+    from('examples/kubejs/server_scripts/gtna_integrated_ore_module.js')
+    from('examples/kubejs/server_scripts/gtna_multiple_recipes_module.js')
+    into('run/kubejs/server_scripts')
+}
+tasks.named('runClient').configure {
+    dependsOn 'installIntegratedOreKubeJSExample'
 }

@@ -26,7 +26,7 @@ Diga adeus ao espaguete de tubos! Transmita vapor pela rede wireless com hatches
 
 <div class="feature-card" markdown>
 ### 🏗️ Multiblocos Avançados
-8+ multiblocos a vapor para processamento em massa: Large Steam Furnace (9x velocidade!), Mega Solar Boiler (vapor infinito), Steam Woodcutter, e mais.
+8+ multiblocos a vapor para processamento em massa: Large Steam Furnace (9x velocidade!), Large Steam Solar Boiler (vapor infinito), Steam Woodcutter, e mais.
 
 [:octicons-arrow-right-24: Ver máquinas](gameplay/machines/index.md)
 </div>
@@ -83,7 +83,7 @@ Acompanhe o que estamos desenvolvendo: novos multiblocos, Pattern Buffer, novos 
 | Thread / Accelerate / Overclock Hatches | <span class="status-badge status-done">✅ Pronto</span> |
 | Advanced Parallel Hatches | <span class="status-badge status-done">✅ Pronto</span> |
 | **Nexus Flux Matrix (Wireless Energy)** | <span class="status-badge status-wip">🔄 Em Progresso</span> |
-| Pattern Buffer System | <span class="status-badge status-planned">🔮 Planejado</span> |
+| Pattern Buffer System | <span class="status-badge status-done">✅ Pronto</span> |
 | Novos Elementos & Ligas | <span class="status-badge status-planned">🔮 Planejado</span> |
 | Integração KubeJS | <span class="status-badge status-planned">🔮 Planejado</span> |
 | Wiki Completa | <span class="status-badge status-wip">🔄 Em Progresso</span> |

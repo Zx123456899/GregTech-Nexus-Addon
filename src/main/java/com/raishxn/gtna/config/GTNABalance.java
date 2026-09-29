@@ -9,6 +9,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonParseException;
 import com.google.gson.reflect.TypeToken;
 import com.raishxn.gtna.GTNACORE;
+import com.raishxn.gtna.api.machine.feature.OverclockHatchMath;
 
 import java.io.IOException;
 import java.io.Reader;
@@ -24,13 +25,13 @@ public final class GTNABalance {
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     private static final Type STRING_INT_MAP = new TypeToken<LinkedHashMap<String, Integer>>() {}.getType();
-    private static final Type STRING_DOUBLE_MAP = new TypeToken<LinkedHashMap<String, Double>>() {}.getType();
     private static final Path BASE_DIR = FMLPaths.CONFIGDIR.get().resolve("gtna").resolve("balance");
 
     private static HatchesBalance hatches = HatchesBalance.defaults();
     private static MachinesBalance machines = MachinesBalance.defaults();
     private static NexusFluxMatrixBalance nexusFluxMatrix = NexusFluxMatrixBalance.defaults();
     private static RestrictedItemsBalance restrictedItems = RestrictedItemsBalance.defaults();
+    private static UniversalFactoryBalance universalFactory = UniversalFactoryBalance.defaults();
 
     private GTNABalance() {}
 
@@ -47,6 +48,8 @@ public final class GTNABalance {
                 NexusFluxMatrixBalance.defaults());
         restrictedItems = load("restricted_items.json", RestrictedItemsBalance.class,
                 RestrictedItemsBalance.defaults());
+        universalFactory = load("universal_factory.json", UniversalFactoryBalance.class,
+                UniversalFactoryBalance.defaults());
     }
 
     private static <T extends DefaultsApplier<T>> T load(String fileName, Class<T> clazz, T defaults) {
@@ -104,8 +107,8 @@ public final class GTNABalance {
                 Math.max(1, 50 - (2 * (tier - 1))));
     }
 
-    public static int getAcceleratePenaltyPerTierBelowMachine() {
-        return hatches.accelerateHatch.penaltyPerTierBelowMachine;
+    public static int getAcceleratePenaltyPerTierBelowRecipe() {
+        return hatches.accelerateHatch.penaltyPerTierBelowRecipe;
     }
 
     public static int getAccelerateMinimumFinalPercent() {
@@ -116,8 +119,9 @@ public final class GTNABalance {
         return hatches.accelerateHatch.maximumFinalPercent;
     }
 
-    public static double getOverclockDurationMultiplier(int tier) {
-        return getDoubleForTier(hatches.overclockHatch.durationMultiplierByTier, tier, 1.0);
+    public static int getOverclockDivisor(int tier) {
+        return getIntForTier(hatches.overclockHatch.divisorByTier, tier,
+                Math.max(OverclockHatchMath.MIN_DIVISOR, tier - 6));
     }
 
     public static int getThreadCount(int tier) {
@@ -125,24 +129,36 @@ public final class GTNABalance {
                 Math.max(0, (1 << Math.max(0, tier - 6)) - 1));
     }
 
-    public static long getMegaSolarSteamPerBlock() {
-        return machines.megaSolarBoiler.steamPerBlock;
+    public static int getUniversalFactoryBaseParallel() {
+        return universalFactory.baseParallel;
     }
 
-    public static int getMegaSolarTickInterval() {
-        return machines.megaSolarBoiler.tickInterval;
+    public static int getUniversalFactoryBaseThreads() {
+        return universalFactory.baseThreads;
     }
 
-    public static int getMegaSolarMaxBackDistance() {
-        return machines.megaSolarBoiler.maxBackDistance;
+    public static double getUniversalFactoryMaxWarmup() {
+        return universalFactory.maxWarmup;
     }
 
-    public static int getMegaSolarMaxSideDistance() {
-        return machines.megaSolarBoiler.maxSideDistance;
+    public static double getUniversalFactoryWarmupTau() {
+        return universalFactory.warmupTau;
     }
 
-    public static boolean isMegaSolarClearSkyRequired() {
-        return machines.megaSolarBoiler.requireClearSky;
+    public static int getUniversalFactoryOverloadTime() {
+        return universalFactory.overloadTime;
+    }
+
+    public static int getUniversalFactoryMaxBatchMultiplier() {
+        return universalFactory.maxBatchMultiplier;
+    }
+
+    /**
+     * GTLCore's {@code oreMultiplier} (default 4): scales the crushed-ore amount the integrated ore
+     * processors consume per ore, and therefore every output, byproduct and duration.
+     */
+    public static int getIntegratedOreMultiplier() {
+        return machines.integratedOreMultiplier;
     }
 
     public static VoidMinerSteamTierBalance getVoidMinerDenseSteam() {
@@ -186,11 +202,6 @@ public final class GTNABalance {
 
     private static int getIntForTier(Map<String, Integer> map, int tier, int fallback) {
         Integer value = map.get(tierKey(tier));
-        return value != null ? value : fallback;
-    }
-
-    private static double getDoubleForTier(Map<String, Double> map, int tier, double fallback) {
-        Double value = map.get(tierKey(tier));
         return value != null ? value : fallback;
     }
 
@@ -246,6 +257,31 @@ public final class GTNABalance {
         }
     }
 
+    /** Tuning for the ported Universal Factory (GTLsupb parity). */
+    public static final class UniversalFactoryBalance implements DefaultsApplier<UniversalFactoryBalance> {
+
+        public int baseParallel = 64;
+        public int baseThreads = 16;
+        public double maxWarmup = 8.0;
+        public double warmupTau = 60.0;
+        public int overloadTime = 120;
+        public int maxBatchMultiplier = 1000;
+
+        public static UniversalFactoryBalance defaults() {
+            return new UniversalFactoryBalance();
+        }
+
+        @Override
+        public void applyDefaults(UniversalFactoryBalance defaults) {
+            if (baseParallel <= 0) baseParallel = defaults.baseParallel;
+            if (baseThreads <= 0) baseThreads = defaults.baseThreads;
+            if (maxWarmup < 1.0) maxWarmup = defaults.maxWarmup;
+            if (warmupTau <= 0) warmupTau = defaults.warmupTau;
+            if (overloadTime <= 0) overloadTime = defaults.overloadTime;
+            if (maxBatchMultiplier <= 0) maxBatchMultiplier = defaults.maxBatchMultiplier;
+        }
+    }
+
     public static final class ThreadHatchBalance implements DefaultsApplier<ThreadHatchBalance> {
 
         public Map<String, Integer> extraThreadsByTier = defaultThreadMap();
@@ -267,7 +303,8 @@ public final class GTNABalance {
     public static final class AccelerateHatchBalance implements DefaultsApplier<AccelerateHatchBalance> {
 
         public Map<String, Integer> baseMinDurationPercentByTier = defaultAccelerateMap();
-        public int penaltyPerTierBelowMachine = 20;
+        /** Percentage added per recipe tier above the hatch tier (GTOCore semantics). */
+        public int penaltyPerTierBelowRecipe = 20;
         public int minimumFinalPercent = 1;
         public int maximumFinalPercent = 100;
 
@@ -282,7 +319,7 @@ public final class GTNABalance {
             } else {
                 defaults.baseMinDurationPercentByTier.forEach(baseMinDurationPercentByTier::putIfAbsent);
             }
-            if (penaltyPerTierBelowMachine <= 0) penaltyPerTierBelowMachine = defaults.penaltyPerTierBelowMachine;
+            if (penaltyPerTierBelowRecipe <= 0) penaltyPerTierBelowRecipe = defaults.penaltyPerTierBelowRecipe;
             if (minimumFinalPercent <= 0) minimumFinalPercent = defaults.minimumFinalPercent;
             if (maximumFinalPercent <= 0) maximumFinalPercent = defaults.maximumFinalPercent;
         }
@@ -290,7 +327,11 @@ public final class GTNABalance {
 
     public static final class OverclockHatchBalance implements DefaultsApplier<OverclockHatchBalance> {
 
-        public Map<String, Double> durationMultiplierByTier = defaultOverclockMap();
+        /**
+         * Best (largest) duration divisor per tier: the tier's {@code tier - 6} in GTOCore terms
+         * (UV 2 ... MAX 8). The hatch can be dialed down to {@code 2} (standard overclock).
+         */
+        public Map<String, Integer> divisorByTier = defaultOverclockDivisorMap();
 
         public static OverclockHatchBalance defaults() {
             return new OverclockHatchBalance();
@@ -298,10 +339,10 @@ public final class GTNABalance {
 
         @Override
         public void applyDefaults(OverclockHatchBalance defaults) {
-            if (durationMultiplierByTier == null) {
-                durationMultiplierByTier = defaults.durationMultiplierByTier;
+            if (divisorByTier == null) {
+                divisorByTier = defaults.divisorByTier;
             } else {
-                defaults.durationMultiplierByTier.forEach(durationMultiplierByTier::putIfAbsent);
+                defaults.divisorByTier.forEach(divisorByTier::putIfAbsent);
             }
         }
     }
@@ -329,8 +370,12 @@ public final class GTNABalance {
 
     public static final class MachinesBalance implements DefaultsApplier<MachinesBalance> {
 
-        public MegaSolarBalance megaSolarBoiler = MegaSolarBalance.defaults();
         public VoidMinerSteamGateBalance voidMinerSteamGateAged = VoidMinerSteamGateBalance.defaults();
+        /**
+         * GTLCore's {@code oreMultiplier}: the crushed-ore amount (and so every output) of the
+         * integrated ore processing recipes. 4 = GTLCore parity.
+         */
+        public int integratedOreMultiplier = 4;
 
         public static MachinesBalance defaults() {
             return new MachinesBalance();
@@ -338,32 +383,9 @@ public final class GTNABalance {
 
         @Override
         public void applyDefaults(MachinesBalance defaults) {
-            if (megaSolarBoiler == null) megaSolarBoiler = defaults.megaSolarBoiler;
-            else megaSolarBoiler.applyDefaults(defaults.megaSolarBoiler);
             if (voidMinerSteamGateAged == null) voidMinerSteamGateAged = defaults.voidMinerSteamGateAged;
             else voidMinerSteamGateAged.applyDefaults(defaults.voidMinerSteamGateAged);
-        }
-    }
-
-    public static final class MegaSolarBalance implements DefaultsApplier<MegaSolarBalance> {
-
-        public boolean enabled = true;
-        public int steamPerBlock = 500;
-        public int tickInterval = 20;
-        public boolean requireClearSky = true;
-        public int maxBackDistance = 32;
-        public int maxSideDistance = 16;
-
-        public static MegaSolarBalance defaults() {
-            return new MegaSolarBalance();
-        }
-
-        @Override
-        public void applyDefaults(MegaSolarBalance defaults) {
-            if (steamPerBlock <= 0) steamPerBlock = defaults.steamPerBlock;
-            if (tickInterval <= 0) tickInterval = defaults.tickInterval;
-            if (maxBackDistance <= 0) maxBackDistance = defaults.maxBackDistance;
-            if (maxSideDistance <= 0) maxSideDistance = defaults.maxSideDistance;
+            if (integratedOreMultiplier <= 0) integratedOreMultiplier = defaults.integratedOreMultiplier;
         }
     }
 
@@ -415,7 +437,6 @@ public final class GTNABalance {
 
         public Map<String, NexusTierBalance> tiers = defaultNexusTierMap();
         public EfficiencyBalance efficiency = EfficiencyBalance.defaults();
-        public SafeModeBalance safeMode = SafeModeBalance.defaults();
         public NexusLimitsBalance limits = NexusLimitsBalance.defaults();
 
         public static NexusFluxMatrixBalance defaults() {
@@ -431,8 +452,6 @@ public final class GTNABalance {
             }
             if (efficiency == null) efficiency = defaults.efficiency;
             else efficiency.applyDefaults(defaults.efficiency);
-            if (safeMode == null) safeMode = defaults.safeMode;
-            else safeMode.applyDefaults(defaults.safeMode);
             if (limits == null) limits = defaults.limits;
             else limits.applyDefaults(defaults.limits);
         }
@@ -470,25 +489,6 @@ public final class GTNABalance {
             if (baseLossPercentAtLV < 0) baseLossPercentAtLV = defaults.baseLossPercentAtLV;
             if (minimumEfficiency <= 0) minimumEfficiency = defaults.minimumEfficiency;
             if (maximumEfficiency <= 0) maximumEfficiency = defaults.maximumEfficiency;
-        }
-    }
-
-    public static final class SafeModeBalance implements DefaultsApplier<SafeModeBalance> {
-
-        public boolean enabled = true;
-        public int thresholdPercent = 10;
-        public int recoveryPercent = 25;
-        public int alertCooldownTicks = 1200;
-
-        public static SafeModeBalance defaults() {
-            return new SafeModeBalance();
-        }
-
-        @Override
-        public void applyDefaults(SafeModeBalance defaults) {
-            if (thresholdPercent <= 0) thresholdPercent = defaults.thresholdPercent;
-            if (recoveryPercent <= 0) recoveryPercent = defaults.recoveryPercent;
-            if (alertCooldownTicks <= 0) alertCooldownTicks = defaults.alertCooldownTicks;
         }
     }
 
@@ -562,15 +562,15 @@ public final class GTNABalance {
         return values;
     }
 
-    private static Map<String, Double> defaultOverclockMap() {
-        LinkedHashMap<String, Double> values = new LinkedHashMap<>();
-        values.put("UV", 0.50);
-        values.put("UHV", 0.3333);
-        values.put("UEV", 0.25);
-        values.put("UIV", 0.20);
-        values.put("UXV", 0.1667);
-        values.put("OpV", 0.1429);
-        values.put("MAX", 0.125);
+    private static Map<String, Integer> defaultOverclockDivisorMap() {
+        LinkedHashMap<String, Integer> values = new LinkedHashMap<>();
+        values.put("UV", 2);
+        values.put("UHV", 3);
+        values.put("UEV", 4);
+        values.put("UIV", 5);
+        values.put("UXV", 6);
+        values.put("OpV", 7);
+        values.put("MAX", 8);
         return values;
     }
 

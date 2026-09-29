@@ -6,28 +6,38 @@ import com.gregtechceu.gtceu.api.data.chemical.material.event.MaterialRegistryEv
 import com.gregtechceu.gtceu.api.data.chemical.material.event.PostMaterialEvent;
 import com.gregtechceu.gtceu.api.machine.MachineDefinition;
 import com.gregtechceu.gtceu.api.recipe.GTRecipeType;
-import com.gregtechceu.gtceu.client.renderer.machine.DynamicRenderManager;
 import com.gregtechceu.gtceu.api.recipe.condition.RecipeConditionType;
 
 import net.minecraft.core.HolderLookup;
 import net.minecraft.data.DataGenerator;
 import net.minecraft.data.PackOutput;
+import net.minecraft.gametest.framework.GameTestServer;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraftforge.client.event.ModelEvent;
+import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.data.event.GatherDataEvent;
+import net.minecraftforge.event.entity.player.PlayerEvent;
+import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
+import net.minecraftforge.fml.ModList;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 
 import com.raishxn.gtna.GTNACORE;
+import com.raishxn.gtna.api.machine.multiblock.GTNASubPatterns;
 import com.raishxn.gtna.client.renderer.machine.AnnihilateGeneratorRenderer;
+import com.raishxn.gtna.client.renderer.machine.BallHatchRenderer;
 import com.raishxn.gtna.client.renderer.machine.EyeOfHarmonyRenderer;
 import com.raishxn.gtna.client.renderer.machine.EyeOfWoodRenderer;
 import com.raishxn.gtna.common.data.*;
 import com.raishxn.gtna.data.GTNALangProvider;
 import com.raishxn.gtna.data.recipe.GTNARecipeConditions;
+import com.raishxn.gtna.gametest.GTNAGameTestReport;
+import com.raishxn.gtna.integration.kubejs.GTNAKubeJSSubPatternLoader;
 import com.raishxn.gtna.network.GTNANetworkHandler;
+import com.raishxn.gtna.network.packet.SKubeModuleDescriptions;
 
 import java.util.concurrent.CompletableFuture;
 
@@ -49,10 +59,27 @@ public class CommonProxy {
         eventBus.addGenericListener(GTRecipeType.class, this::registerRecipeTypes);
         eventBus.addGenericListener(MachineDefinition.class, this::registerMachines);
         eventBus.addListener(this::gatherData);
+        MinecraftForge.EVENT_BUS.addListener(this::serverStarting);
+        MinecraftForge.EVENT_BUS.addListener(this::playerLoggedIn);
     }
 
     public static void init() {
         GTNACreativeModeTabs.init();
+    }
+
+    private void serverStarting(ServerStartingEvent event) {
+        if (event.getServer() instanceof GameTestServer) {
+            GTNAGameTestReport.install();
+        }
+        if (ModList.get().isLoaded("kubejs")) {
+            GTNAKubeJSSubPatternLoader.load();
+        }
+    }
+
+    private void playerLoggedIn(PlayerEvent.PlayerLoggedInEvent event) {
+        if (event.getEntity() instanceof ServerPlayer player) {
+            GTNANetworkHandler.sendToPlayer(new SKubeModuleDescriptions(GTNASubPatterns.kubeDescriptions()), player);
+        }
     }
 
     /**
@@ -74,12 +101,9 @@ public class CommonProxy {
     }
 
     private void clientSetup(final FMLClientSetupEvent event) {
-        // Register the DynamicRenderTypes synchronously during mod setup.
-        // Must NOT be deferred via enqueueWork(), otherwise it runs after the
-        // Resource reload has started and the machine block models referencing
-        // these dynamic render types fail to bake -> the machine casing renders
-        // as invisible while the dynamic spheres still draw.
-        registerDynamicRenderers();
+        event.enqueueWork(() -> {
+            registerDynamicRenderers();
+        });
     }
 
     private void registerAdditionalModels(ModelEvent.RegisterAdditional event) {
@@ -94,19 +118,10 @@ public class CommonProxy {
     }
 
     private static void registerDynamicRenderers() {
-        // Register each dynamic render type explicitly (and idempotently). Keeping the
-        // registration here — instead of inside the renderer's static field initializer —
-        // makes the timing deterministic, so the machine models can find their dynamic
-        // render types when they bake during resource reload.
-        if (DynamicRenderManager.getType(GTNACORE.id("annihilate_generator/star")) == null) {
-            DynamicRenderManager.register(GTNACORE.id("annihilate_generator/star"), AnnihilateGeneratorRenderer.TYPE);
-        }
-        if (DynamicRenderManager.getType(GTNACORE.id("eye_of_harmony/render")) == null) {
-            DynamicRenderManager.register(GTNACORE.id("eye_of_harmony/render"), EyeOfHarmonyRenderer.TYPE);
-        }
-        if (DynamicRenderManager.getType(GTNACORE.id("eye_of_wood/render")) == null) {
-            DynamicRenderManager.register(GTNACORE.id("eye_of_wood/render"), EyeOfWoodRenderer.TYPE);
-        }
+        var ignoredAnnihilate = AnnihilateGeneratorRenderer.TYPE;
+        var ignoredEyeOfHarmony = EyeOfHarmonyRenderer.TYPE;
+        var ignoredEyeOfWood = EyeOfWoodRenderer.TYPE;
+        var ignoredBallHatch = BallHatchRenderer.TYPE;
     }
 
     // You MUST have this for custom materials.
@@ -134,6 +149,12 @@ public class CommonProxy {
     private void registerMachines(GTCEuAPI.RegisterEvent<ResourceLocation, MachineDefinition> event) {
         GTNAMachines.init();
         GTNAMachines2.init();
+        GTNAMachines3.init();
         GTNAEnergyHatches.init();
+        // Append the shared high-pressure line before the source attribution, so the tooltip reads
+        // stats -> high pressure -> Source.
+        GTNASteamTooltips.applyAll();
+        // Append the ported-content attribution line once every GTNA machine is registered.
+        GTNASources.applyAll();
     }
 }
