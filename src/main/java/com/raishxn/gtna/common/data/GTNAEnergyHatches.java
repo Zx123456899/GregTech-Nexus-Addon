@@ -14,6 +14,7 @@ import net.minecraft.network.chat.Component;
 import com.raishxn.gtna.common.machine.multiblock.energy.NexusFluxMatrixMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.energy.WirelessDynamoHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.energy.WirelessEnergyHatchPartMachine;
+import com.raishxn.gtna.utils.VoltageCompression;
 
 import java.util.Locale;
 
@@ -84,19 +85,23 @@ public class GTNAEnergyHatches {
 
     private static void registerWirelessHatches(int tier, int amps, int ampExp) {
         String tierName = GTValues.VN[tier].toLowerCase(Locale.ROOT);
+        // The machine ID keeps the original tier name, but its voltage rating, capacity, textures
+        // and tooltip are compressed into the HV..UV window (energy parts must not exceed UV).
+        int defTier = VoltageCompression.compress(tier);
+        String defTierName = GTValues.VN[defTier].toLowerCase(Locale.ROOT);
 
         // E.g. wireless_energy_hatch_1A_lv
         String outName = "wireless_energy_hatch_" + amps + "a_" + tierName;
         String inName = "wireless_dynamo_hatch_" + amps + "a_" + tierName;
 
-        String upperTierName = GTValues.VN[tier];
-        long capacity = GTValues.V[tier] * 64L * amps;
+        String upperTierName = GTValues.VNF[defTier];
+        long capacity = GTValues.V[defTier] * 64L * amps;
         String capacityStr = formatCapacity(capacity);
 
         WIRELESS_ENERGY_HATCHES[tier][ampExp] = REGISTRATE
-                .machine(outName, holder -> new WirelessEnergyHatchPartMachine(holder, tier, amps))
-                .langValue(GTValues.VNF[tier] + " " + amps + "A Wireless Energy Hatch")
-                .tier(tier)
+                .machine(outName, holder -> new WirelessEnergyHatchPartMachine(holder, defTier, amps))
+                .langValue(GTValues.VNF[defTier] + " " + amps + "A Wireless Energy Hatch")
+                .tier(defTier)
                 .rotationState(RotationState.ALL)
                 .abilities(com.gregtechceu.gtceu.api.machine.multiblock.PartAbility.INPUT_ENERGY)
                 .modelProperty(IS_FORMED, false)
@@ -106,10 +111,10 @@ public class GTNAEnergyHatches {
                             .texture("overlay",
                                     new net.minecraft.resources.ResourceLocation("gtna",
                                             "block/overlay/machine/overlay_steam_wireless_out"))
-                            .texture("side", GTCEu.id("block/casings/voltage/" + tierName + "/side"))
-                            .texture("top", GTCEu.id("block/casings/voltage/" + tierName + "/top"))
-                            .texture("bottom", GTCEu.id("block/casings/voltage/" + tierName + "/bottom"))
-                            .texture("particle", GTCEu.id("block/casings/voltage/" + tierName + "/side"));
+                            .texture("side", GTCEu.id("block/casings/voltage/" + defTierName + "/side"))
+                            .texture("top", GTCEu.id("block/casings/voltage/" + defTierName + "/top"))
+                            .texture("bottom", GTCEu.id("block/casings/voltage/" + defTierName + "/bottom"))
+                            .texture("particle", GTCEu.id("block/casings/voltage/" + defTierName + "/side"));
                     builder.partialState().setModel(model);
                 })
                 .tooltips(
@@ -121,9 +126,9 @@ public class GTNAEnergyHatches {
                 .register();
 
         WIRELESS_DYNAMO_HATCHES[tier][ampExp] = REGISTRATE
-                .machine(inName, holder -> new WirelessDynamoHatchPartMachine(holder, tier, amps))
-                .langValue(GTValues.VNF[tier] + " " + amps + "A Wireless Dynamo Hatch")
-                .tier(tier)
+                .machine(inName, holder -> new WirelessDynamoHatchPartMachine(holder, defTier, amps))
+                .langValue(GTValues.VNF[defTier] + " " + amps + "A Wireless Dynamo Hatch")
+                .tier(defTier)
                 .rotationState(RotationState.ALL)
                 .abilities(com.gregtechceu.gtceu.api.machine.multiblock.PartAbility.OUTPUT_ENERGY)
                 .modelProperty(IS_FORMED, false)
@@ -133,10 +138,10 @@ public class GTNAEnergyHatches {
                             .texture("overlay",
                                     new net.minecraft.resources.ResourceLocation("gtna",
                                             "block/overlay/machine/overlay_steam_wireless_in"))
-                            .texture("side", GTCEu.id("block/casings/voltage/" + tierName + "/side"))
-                            .texture("top", GTCEu.id("block/casings/voltage/" + tierName + "/top"))
-                            .texture("bottom", GTCEu.id("block/casings/voltage/" + tierName + "/bottom"))
-                            .texture("particle", GTCEu.id("block/casings/voltage/" + tierName + "/side"));
+                            .texture("side", GTCEu.id("block/casings/voltage/" + defTierName + "/side"))
+                            .texture("top", GTCEu.id("block/casings/voltage/" + defTierName + "/top"))
+                            .texture("bottom", GTCEu.id("block/casings/voltage/" + defTierName + "/bottom"))
+                            .texture("particle", GTCEu.id("block/casings/voltage/" + defTierName + "/side"));
                     builder.partialState().setModel(model);
                 })
                 .tooltips(

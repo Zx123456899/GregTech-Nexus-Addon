@@ -1328,7 +1328,7 @@ public class GTNAMachineRecipes {
                     .inputItems(GTNABlocks.ANNIHILATE_CORE.asItem())
                     .inputItems(GTItems.EMITTER_ZPM, 4)
                     .inputItems(GTItems.SENSOR_ZPM, 4)
-                    .inputItems(CustomTags.OpV_CIRCUITS, 4)
+                    .inputItems(CustomTags.EV_CIRCUITS, 4)
                     .inputItems(GTItems.FIELD_GENERATOR_ZPM, 16)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium).getItem(), 8)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.NaquadahAlloy).getItem(), 8)
@@ -1357,7 +1357,7 @@ public class GTNAMachineRecipes {
                     .inputItems(GTItems.ELECTRIC_PUMP_ZPM, 8)
                     .inputItems(GTItems.ELECTRIC_MOTOR_ZPM, 8)
                     .inputItems(GTItems.GRAVI_STAR, 8)
-                    .inputItems(CustomTags.OpV_CIRCUITS, 16)
+                    .inputItems(CustomTags.EV_CIRCUITS, 16)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium).getItem(), 32)
                     .inputFluids(GTMaterials.SolderingAlloy.getFluid(48000))
                     .inputFluids(GTMaterials.Neutronium.getFluid(57600))
@@ -1660,7 +1660,7 @@ public class GTNAMachineRecipes {
 
         GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("nexus_capacitor_uhv")
                 .inputItems(GTNABlocks.NEXUS_CAPACITOR_UV.asStack().getItem(), 2)
-                .inputItems(CustomTags.UHV_CIRCUITS, 4)
+                .inputItems(CustomTags.UV_CIRCUITS, 4)
                 .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.Neutronium).getItem(), 8)
                 .inputFluids(GTMaterials.SolderingAlloy.getFluid(9216))
                 .outputItems(GTNABlocks.NEXUS_CAPACITOR_UHV.asStack())
@@ -1964,7 +1964,7 @@ public class GTNAMachineRecipes {
                 .EUt(30720).duration(200).save(provider);
         GTRecipeTypes.ASSEMBLER_RECIPES.recipeBuilder("cell_component_256m")
                 .inputItems(GTNAItems.CELL_COMPONENT_64M.asItem())
-                .inputItems(CustomTags.UHV_CIRCUITS, 2)
+                .inputItems(CustomTags.UV_CIRCUITS, 2)
                 .inputItems(AEItems.LOGIC_PROCESSOR.asItem())
                 .inputItems(AEItems.ENGINEERING_PROCESSOR.asItem())
                 .inputItems(AEItems.CALCULATION_PROCESSOR.asItem())
@@ -2157,23 +2157,24 @@ public class GTNAMachineRecipes {
         }
 
         if (enabled(GTNAMachines.ADVANCED_INTEGRATED_ORE_PROCESSOR)) {
+            // Compressed: UHV parts and EUt mapped to UV (see VOLTAGE_COMPRESSION.md).
             GTRecipeTypes.ASSEMBLY_LINE_RECIPES.recipeBuilder("advanced_integrated_ore_processor")
                     .inputItems(GTBlocks.CASING_TUNGSTENSTEEL_ROBUST.asItem(), 8)
                     .inputItems(ChemicalHelper.get(TagPrefix.frameGt, GTMaterials.HSSS).getItem(), 8)
                     .inputItems(GTNABlocks.RESTRAINT_DEVICE.asItem(), 4)
                     .inputItems(GTNABlocks.BOROSILICATE_GLASS_BLOCK.asItem(), 8)
-                    .inputItems(GTItems.EMITTER_UHV, 4)
-                    .inputItems(GTItems.SENSOR_UHV, 4)
-                    .inputItems(GTItems.FIELD_GENERATOR_UHV, 4)
-                    .inputItems(CustomTags.UHV_CIRCUITS, 4)
+                    .inputItems(GTItems.EMITTER_UV, 4)
+                    .inputItems(GTItems.SENSOR_UV, 4)
+                    .inputItems(GTItems.FIELD_GENERATOR_UV, 4)
+                    .inputItems(CustomTags.UV_CIRCUITS, 4)
                     .inputItems(ChemicalHelper.get(TagPrefix.plateDouble, GTMaterials.NaquadahAlloy).getItem(), 4)
                     .inputFluids(GTMaterials.SolderingAlloy.getFluid(1296))
                     .outputItems(GTNAMachines.ADVANCED_INTEGRATED_ORE_PROCESSOR.asStack())
                     .duration(1200)
-                    .EUt(GTValues.VA[GTValues.UHV])
+                    .EUt(GTValues.VA[GTValues.UV])
                     .stationResearch(b -> b.researchStack(GTNABlocks.RESTRAINT_DEVICE.asStack())
                             .CWUt(1024)
-                            .EUt(GTValues.VA[GTValues.UHV]))
+                            .EUt(GTValues.VA[GTValues.UV]))
                     .save(provider);
         }
 

@@ -42,6 +42,7 @@ import com.raishxn.gtna.common.machine.multiblock.part.AdvancedParallelHatchPart
 import com.raishxn.gtna.common.machine.multiblock.part.BallHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.InfiniteInputBusPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.InfiniteInputHatchPartMachine;
+import com.raishxn.gtna.utils.VoltageCompression;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostFluidHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostItemBusPartMachine;
@@ -168,14 +169,15 @@ public class GTNAMachines2 {
             .register());
 
     private static void registerPatternBuffers() {
+        // ME series: all fixed-tier ME parts are rated HV on the voltage-compression branch.
         ME_MINI_PATTERN_BUFFER = ConfigHolder.isHatchEnabled("meMiniPatternBuffer") ?
-                registerPatternBuffer("me_mini_pattern_buffer", GTValues.LuV, 9) : null;
+                registerPatternBuffer("me_mini_pattern_buffer", GTValues.HV, 9) : null;
         ME_PATTERN_BUFFER = ConfigHolder.isHatchEnabled("mePatternBuffer") ?
-                registerPatternBuffer("me_pattern_buffer", GTValues.ZPM, 21) : null;
+                registerPatternBuffer("me_pattern_buffer", GTValues.HV, 21) : null;
         ME_ADVANCED_PATTERN_BUFFER = ConfigHolder.isHatchEnabled("meAdvancedPatternBuffer") ?
-                registerPatternBuffer("me_advanced_pattern_buffer", GTValues.UV, 32) : null;
+                registerPatternBuffer("me_advanced_pattern_buffer", GTValues.HV, 32) : null;
         ME_ULTIMATE_PATTERN_BUFFER = ConfigHolder.isHatchEnabled("meUltimatePatternBuffer") ?
-                registerPatternBuffer("me_ultimate_pattern_buffer", GTValues.UHV, 72) : null;
+                registerPatternBuffer("me_ultimate_pattern_buffer", GTValues.HV, 72) : null;
         ME_CRAFT_PATTERN_HATCH = ConfigHolder.isHatchEnabled("meCraftPatternHatch") ? registerCraftPatternHatch() :
                 null;
         ME_PATTERN_BUFFER_PROXY = ConfigHolder.isHatchEnabled("mePatternBufferProxy") ?
@@ -188,7 +190,7 @@ public class GTNAMachines2 {
      */
     private static MachineDefinition registerPatternBufferProxy() {
         return REGISTRATE.machine("me_pattern_buffer_proxy", GTNAMEPatternBufferProxyPartMachine::new)
-                .tier(GTValues.UV)
+                .tier(GTValues.HV)
                 .rotationState(RotationState.ALL)
                 .abilities(
                         PartAbility.IMPORT_ITEMS,
@@ -251,7 +253,7 @@ public class GTNAMachines2 {
 
     private static MachineDefinition registerCraftPatternHatch() {
         return REGISTRATE.machine("me_craft_pattern_hatch", holder -> new GTNACraftPatternPartMachine(holder, 72))
-                .tier(GTValues.ZPM)
+                .tier(GTValues.HV)
                 .rotationState(RotationState.ALL)
                 .abilities(
                         PartAbility.IMPORT_ITEMS,
@@ -285,19 +287,19 @@ public class GTNAMachines2 {
         ME_STORAGE_ACCESS_HATCH = ConfigHolder.isHatchEnabled("meStorageAccessHatch") ?
                 registerMEStorageAccessHatch(
                         "me_storage_access_hatch",
-                        GTValues.EV,
+                        GTValues.HV,
                         GTNAMEStorageAccessPartMachine.Mode.STORAGE) :
                 null;
         ME_BIG_STORAGE_ACCESS_HATCH = ConfigHolder.isHatchEnabled("meBigStorageAccessHatch") ?
                 registerMEStorageAccessHatch(
                         "me_big_storage_access_hatch",
-                        GTValues.IV,
+                        GTValues.HV,
                         GTNAMEStorageAccessPartMachine.Mode.BIG_STORAGE) :
                 null;
         ME_IO_PORT_HATCH = ConfigHolder.isHatchEnabled("meIOPortHatch") ?
                 registerMEStorageAccessHatch(
                         "me_io_port_hatch",
-                        GTValues.EV,
+                        GTValues.HV,
                         GTNAMEStorageAccessPartMachine.Mode.IO_PORT) :
                 null;
     }
@@ -351,7 +353,7 @@ public class GTNAMachines2 {
         ADVANCED_PARALLEL_HATCH[tier] = REGISTRATE
                 .machine("parallel_hatch_" + tierName,
                         holder -> new AdvancedParallelHatchPartMachine(holder, tier, parallelAmount))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(PartAbility.PARALLEL_HATCH)
                 .modelProperty(IS_FORMED, false)
@@ -391,7 +393,7 @@ public class GTNAMachines2 {
         int minPercentage = Math.max(1, 50 - (2 * (tier - 1)));
         ACCELERATE_HATCHES[tier] = REGISTRATE
                 .machine(regName, holder -> new AccelerateHatchPartMachine(holder, tier))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(GTNAPartAbility.ACCELERATE_HATCH)
                 .modelProperty(IS_FORMED, false)
@@ -439,7 +441,7 @@ public class GTNAMachines2 {
 
             THREAD_HATCHES[tier] = REGISTRATE
                     .machine(regName, holder -> new ThreadPartMachine(holder, tier))
-                    .tier(tier)
+                    .tier(VoltageCompression.compress(tier))
                     .rotationState(RotationState.ALL)
                     .abilities(GTNAPartAbility.THREAD_HATCH)
                     .modelProperty(IS_FORMED, false)
@@ -630,7 +632,7 @@ public class GTNAMachines2 {
 
         OUTPUT_BOOST_HATCHES[tier] = REGISTRATE
                 .machine(regName, holder -> new OutputBoostHatchPartMachine(holder, tier))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(GTNAPartAbility.OUTPUT_BOOST_HATCH, PartAbility.EXPORT_ITEMS, PartAbility.EXPORT_FLUIDS)
                 .modelProperty(IS_FORMED, false)
@@ -658,7 +660,7 @@ public class GTNAMachines2 {
         String tierName = GTValues.VN[tier].toLowerCase(Locale.ROOT);
         INFINITE_INPUT_BUSES[tier] = REGISTRATE
                 .machine("infinite_input_bus_" + tierName, holder -> new InfiniteInputBusPartMachine(holder, tier))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(PartAbility.IMPORT_ITEMS)
                 .modelProperty(IS_FORMED, false)
@@ -683,7 +685,7 @@ public class GTNAMachines2 {
         String tierName = GTValues.VN[tier].toLowerCase(Locale.ROOT);
         INFINITE_INPUT_HATCHES[tier] = REGISTRATE
                 .machine("infinite_input_hatch_" + tierName, holder -> new InfiniteInputHatchPartMachine(holder, tier))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(PartAbility.IMPORT_FLUIDS)
                 .modelProperty(IS_FORMED, false)
@@ -709,7 +711,7 @@ public class GTNAMachines2 {
         int multiplier = OutputBoostHatchPartMachine.getMultiplierForTier(tier);
         OUTPUT_BOOST_ITEM_BUSES[tier] = REGISTRATE
                 .machine("output_boost_item_bus_" + tierName, holder -> new OutputBoostItemBusPartMachine(holder, tier))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(PartAbility.EXPORT_ITEMS)
                 .modelProperty(IS_FORMED, false)
@@ -737,7 +739,7 @@ public class GTNAMachines2 {
         OUTPUT_BOOST_FLUID_HATCHES[tier] = REGISTRATE
                 .machine("output_boost_fluid_hatch_" + tierName,
                         holder -> new OutputBoostFluidHatchPartMachine(holder, tier))
-                .tier(tier)
+                .tier(VoltageCompression.compress(tier))
                 .rotationState(RotationState.ALL)
                 .abilities(PartAbility.EXPORT_FLUIDS)
                 .modelProperty(IS_FORMED, false)
@@ -781,7 +783,7 @@ public class GTNAMachines2 {
                     OverclockHatchMath.stepFactor(divisor) * 100.0);
             OVERCLOCK_HATCHES[tier] = REGISTRATE
                     .machine(regName, holder -> new OverclockHatchPartMachine(holder, tier))
-                    .tier(tier)
+                    .tier(VoltageCompression.compress(tier))
                     .rotationState(RotationState.ALL)
                     .abilities(GTNAPartAbility.OVERCLOCK_HATCH)
                     .modelProperty(IS_FORMED, false)
