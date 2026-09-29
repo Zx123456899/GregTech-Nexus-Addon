@@ -21,8 +21,7 @@ import com.gregtechceu.gtceu.api.GTValues;
  */
 public final class VoltageCompression {
 
-    private VoltageCompression() {
-    }
+    private VoltageCompression() {}
 
     /** Compress a GT voltage tier into the HV..UV window (identity for tiers &le; UV). */
     public static int compress(int tier) {

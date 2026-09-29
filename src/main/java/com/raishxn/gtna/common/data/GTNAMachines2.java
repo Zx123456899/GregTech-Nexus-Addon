@@ -42,7 +42,6 @@ import com.raishxn.gtna.common.machine.multiblock.part.AdvancedParallelHatchPart
 import com.raishxn.gtna.common.machine.multiblock.part.BallHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.InfiniteInputBusPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.InfiniteInputHatchPartMachine;
-import com.raishxn.gtna.utils.VoltageCompression;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostFluidHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostHatchPartMachine;
 import com.raishxn.gtna.common.machine.multiblock.part.OutputBoostItemBusPartMachine;
@@ -56,6 +55,7 @@ import com.raishxn.gtna.common.machine.multiblock.part.ae.GTNAMEStorageAccessPar
 import com.raishxn.gtna.common.machine.tesseract.DirectedTesseractMachine;
 import com.raishxn.gtna.config.ConfigHolder;
 import com.raishxn.gtna.config.GTNABalance;
+import com.raishxn.gtna.utils.VoltageCompression;
 
 import java.util.Locale;
 import java.util.function.Function;
