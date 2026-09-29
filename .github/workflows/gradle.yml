@@ -36,6 +36,14 @@ jobs:
     - name: Build with Gradle Wrapper
       run: ./gradlew build
 
+    - name: Upload mod JAR
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: gtna-jar
+        if-no-files-found: error
+        path: build/libs/*.jar
+
     - name: Code quality (spotless) + unit tests
       run: ./gradlew spotlessCheck runUnitTests
 

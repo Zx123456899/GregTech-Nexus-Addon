@@ -110,47 +110,49 @@ public class GTNAHatchesRecipes {
     }
 
     private static void createMEStorageAccessRecipes(Consumer<FinishedRecipe> provider) {
+        // ME series: machines are rated HV on the voltage-compression branch, so their recipes
+        // use HV parts too.
         if (GTNAMachines2.ME_STORAGE_ACCESS_HATCH != null) {
-            ItemLike hull = GTMachines.HULL[EV].asStack().getItem();
+            ItemLike hull = GTMachines.HULL[HV].asStack().getItem();
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines2.ME_STORAGE_ACCESS_HATCH.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
                     .pattern("AEA")
-                    .define('A', CustomTags.EV_CIRCUITS)
+                    .define('A', CustomTags.HV_CIRCUITS)
                     .define('B', AEBlocks.CRAFTING_STORAGE_64K.stack().getItem())
-                    .define('C', GTItems.EMITTER_EV.asStack().getItem())
+                    .define('C', GTItems.EMITTER_HV.asStack().getItem())
                     .define('D', hull)
-                    .define('E', GTItems.FIELD_GENERATOR_EV.asStack().getItem())
-                    .unlockedBy("has_hull_ev", InventoryChangeTrigger.TriggerInstance.hasItems(hull))
+                    .define('E', GTItems.FIELD_GENERATOR_HV.asStack().getItem())
+                    .unlockedBy("has_hull_hv", InventoryChangeTrigger.TriggerInstance.hasItems(hull))
                     .save(provider);
         }
         if (GTNAMachines2.ME_BIG_STORAGE_ACCESS_HATCH != null) {
-            ItemLike hull = GTMachines.HULL[IV].asStack().getItem();
+            ItemLike hull = GTMachines.HULL[HV].asStack().getItem();
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC,
                     GTNAMachines2.ME_BIG_STORAGE_ACCESS_HATCH.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
                     .pattern("AEA")
-                    .define('A', CustomTags.IV_CIRCUITS)
+                    .define('A', CustomTags.HV_CIRCUITS)
                     .define('B', AEBlocks.CRAFTING_STORAGE_256K.stack().getItem())
-                    .define('C', GTItems.EMITTER_IV.asStack().getItem())
+                    .define('C', GTItems.EMITTER_HV.asStack().getItem())
                     .define('D', hull)
-                    .define('E', GTItems.FIELD_GENERATOR_IV.asStack().getItem())
-                    .unlockedBy("has_hull_iv", InventoryChangeTrigger.TriggerInstance.hasItems(hull))
+                    .define('E', GTItems.FIELD_GENERATOR_HV.asStack().getItem())
+                    .unlockedBy("has_hull_hv", InventoryChangeTrigger.TriggerInstance.hasItems(hull))
                     .save(provider);
         }
         if (GTNAMachines2.ME_IO_PORT_HATCH != null) {
-            ItemLike hull = GTMachines.HULL[EV].asStack().getItem();
+            ItemLike hull = GTMachines.HULL[HV].asStack().getItem();
             ShapedRecipeBuilder.shaped(RecipeCategory.MISC, GTNAMachines2.ME_IO_PORT_HATCH.asStack().getItem())
                     .pattern("ABA")
                     .pattern("CDC")
                     .pattern("AEA")
-                    .define('A', CustomTags.EV_CIRCUITS)
+                    .define('A', CustomTags.HV_CIRCUITS)
                     .define('B', AEBlocks.IO_PORT.stack().getItem())
-                    .define('C', GTItems.CONVEYOR_MODULE_EV.asStack().getItem())
+                    .define('C', GTItems.CONVEYOR_MODULE_HV.asStack().getItem())
                     .define('D', hull)
-                    .define('E', GTItems.FIELD_GENERATOR_EV.asStack().getItem())
-                    .unlockedBy("has_hull_ev", InventoryChangeTrigger.TriggerInstance.hasItems(hull))
+                    .define('E', GTItems.FIELD_GENERATOR_HV.asStack().getItem())
+                    .unlockedBy("has_hull_hv", InventoryChangeTrigger.TriggerInstance.hasItems(hull))
                     .save(provider);
         }
     }

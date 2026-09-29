@@ -16,6 +16,7 @@ import com.raishxn.gtna.GTNACORE;
 import com.raishxn.gtna.api.data.tag.GTNATagPrefix;
 import com.raishxn.gtna.common.data.GTNAMachines2;
 import com.raishxn.gtna.utils.TextUtil;
+import com.raishxn.gtna.utils.VoltageCompression;
 import org.apache.commons.lang3.text.WordUtils;
 
 import java.io.IOException;
@@ -313,7 +314,7 @@ public class GTNALangProvider extends LanguageProvider {
         add("gtna.machine.overclock_hatch.desc",
                 "§7Changes the overclock scaling itself; it is not a final duration multiplier like the Accelerate Hatch.");
         add("gtna.machine.overclock_hatch.note",
-                "§8Note: at UV the divisor equals the standard overclock, so a UV hatch gives no gain - the gain starts at UHV.");
+                "§8Note: at UV the divisor equals the standard overclock, so a UV hatch gives no gain - the gain starts at the next MK (rated UV on this branch).");
         add("gtna.machine.overclock_hatch.divisor", "Divisor of duration");
         add("gtna.machine.output_boost_hatch.main_function",
                 "§6Main Function:§r §7Multiplies only recipe outputs for compatible multiblocks.");
@@ -872,13 +873,15 @@ public class GTNALangProvider extends LanguageProvider {
         add("gtna.machine.wireless_hatch.capacity", "Buffer Capacity: %s EU");
         add("gtna.machine.wireless_hatch.auto_bind", "§8Place in world to auto-bind to your network");
 
-        // Generate names for all Wireless Hatches (LV to MAX, 1A to MAX A) — colored tier names
+        // Generate names for all Wireless Hatches (LV to MAX, 1A to MAX A) — colored tier names.
+        // Above-UV hatches keep their original item id but are rated at the compressed tier.
         for (int tier = GTValues.LV; tier <= GTValues.MAX; tier++) {
             String tierName = GTValues.VN[tier].toLowerCase(Locale.ROOT);
-            ChatFormatting color = (tier < TextUtil.GTI_CORE$VC.length) ? TextUtil.GTI_CORE$VC[tier] :
+            int defTier = VoltageCompression.compress(tier);
+            ChatFormatting color = (defTier < TextUtil.GTI_CORE$VC.length) ? TextUtil.GTI_CORE$VC[defTier] :
                     ChatFormatting.WHITE;
             String colorCode = getColorCode(color);
-            String coloredTierName = colorCode + GTValues.VN[tier] + "§r";
+            String coloredTierName = colorCode + GTValues.VN[defTier] + "§r";
             for (int ampExp = 0; ampExp <= 10; ampExp++) {
                 int amps = (int) Math.pow(4, ampExp);
                 String outName = "block.gtna.wireless_energy_hatch_" + amps + "a_" + tierName;
@@ -1554,7 +1557,7 @@ public class GTNALangProvider extends LanguageProvider {
         add("gtna.machine.slaughterhouse.circuit2",
                 "§eCircuit 2:§r §7Hostile Mobs §8(2560 EU | Base MV | x2 drops/tier)");
         add("gtna.machine.slaughterhouse.circuit3", "§eCircuit 3:§r §7Bosses §8(32k EU | Base ZPM | x3 drops/tier)");
-        add("gtna.machine.slaughterhouse.circuit4", "§eCircuit 4:§r §7Dragon §8(120k EU | Base UHV | x5 drops/tier)");
+        add("gtna.machine.slaughterhouse.circuit4", "§eCircuit 4:§r §7Dragon §8(120k EU | Base UV | x5 drops/tier)");
         add("gtna.machine.slaughterhouse.tier", "Current Tier: %s");
         add("gtna.machine.slaughterhouse.mode.passive", "Passive Farming");
         add("gtna.machine.slaughterhouse.mode.hostile", "Hostile Farming");

@@ -95,7 +95,8 @@ public class IndustrialSlaughterhouse extends WorkableElectricMultipleRecipesMac
                 multiplierBase = 3;
             }
             case 4 -> {
-                baseTier = GTValues.UHV;
+                // Compressed: was UHV, now the top supported tier UV (see VOLTAGE_COMPRESSION.md).
+                baseTier = GTValues.UV;
                 multiplierBase = 5;
             }
             default -> {
@@ -228,7 +229,7 @@ public class IndustrialSlaughterhouse extends WorkableElectricMultipleRecipesMac
             }
             case 4 -> {
                 mode = "Dragon";
-                base = GTValues.UHV;
+                base = GTValues.UV;
                 mBase = 5;
             }
             default -> {

@@ -243,7 +243,8 @@ public class NexusMEHyperCoreMachine extends WorkableMultiblockMachine implement
             case 1 -> GTValues.EV;
             case 2 -> GTValues.LuV;
             case 3 -> GTValues.UV;
-            case 4 -> GTValues.UEV;
+            // Compressed: was UEV, now the next supported tier ZPM (see VOLTAGE_COMPRESSION.md).
+            case 4 -> GTValues.ZPM;
             default -> GTValues.ULV;
         };
     }
