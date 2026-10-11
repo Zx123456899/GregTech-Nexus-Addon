@@ -1,13 +1,15 @@
 # This workflow uses actions that are not certified by GitHub.
 # They are provided by a third-party and are governed by
-# separate terms of service, privacy policy, and security
+# separate terms of service, privacy policy, and support
 # documentation.
+# This workflow will build a Java project with Gradle and cache/restore any dependencies to improve the workflow execution time
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-java-with-gradle
 
 name: Java CI with Gradle
 
 on:
   push:
-    branches: [ "main", "ci-jar-verify" ]
+    branches: [ "main", "ci-jar-verify", "zpm-compression-0.5.2" ]
   pull_request:
     branches: [ "main" ]
   workflow_dispatch:
@@ -32,61 +34,31 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@af1da67850ed9a4cedd57bfd976089dd991e2582 # v4.0.0
 
-    # ---- datagen MUST run before build ----
-    # GTNA ships zero recipe JSON in git: src/generated/resources/data/gtna/ has only
-    # loot_tables and tags. Every recipe is produced by GTNAGTAddon.addRecipes() during
-    # runData, and `build` does NOT depend on `runData`. Building first therefore packs
-    # a jar with no gtna recipes at all.
-    - name: Run datagen (must precede build)
-      run: ./gradlew runData
-
-    - name: Assert recipes were generated
-      run: |
-        GEN=src/generated/resources/data/gtna/recipes
-        echo "looking for generated recipes under: $GEN"
-        if [ ! -d "$GEN" ]; then
-          echo "::error::no generated recipes directory found at $GEN"
-          echo "---- what runData actually produced ----"
-          find src/generated/resources/data -maxdepth 2 -type d | sort
-          exit 1
-        fi
-        COUNT=$(find "$GEN" -name '*.json' | wc -l)
-        echo "generated recipe json count: $COUNT"
-        if [ "$COUNT" -eq 0 ]; then
-          echo "::error::datagen produced 0 recipe files"
-          exit 1
-        fi
-        echo "---- sample recipe files ----"
-        find "$GEN" -name '*.json' | head -20 | sort
-
+    # NOTE: GTNA recipes are registered at RUNTIME by GTCEu via IGTAddon.addRecipes(),
+    # not by datagen. `runData` only produces blockstates/models/lang/loot_tables/tags,
+    # so `build` alone already yields a fully functional jar. The recipe coverage is
+    # asserted by the GameTest step below (GTNAMachineGameTests reads the live
+    # RecipeManager and requires >= 700 integrated ore recipes).
     - name: Build with Gradle Wrapper
       run: ./gradlew build
 
-    - name: Assert the jar actually contains recipes
+    - name: Sanity-check the produced jar
       run: |
         echo "==== jars produced ===="
-        ls -la build/libs/ || true
+        ls -la build/libs/
         FAIL=0
         for J in build/libs/*.jar; do
           [ -e "$J" ] || continue
           case "$J" in *sources*|*javadoc*) continue;; esac
-          N=$(unzip -l "$J" | grep -cE 'data/gtna/recipes/.*\.json' || true)
-          echo "$J -> gtna recipe entries: $N"
-          if [ "$N" -eq 0 ]; then
-            echo "::error::$J contains no gtna recipes"
-            FAIL=1
+          SIZE=$(stat -c%s "$J")
+          MODS=$(unzip -l "$J" | grep -c 'META-INF/mods.toml' || true)
+          ADDON=$(unzip -l "$J" | grep -c 'GTNAGTAddon.class' || true)
+          echo "$J | ${SIZE} bytes | mods.toml=$MODS | GTNAGTAddon.class=$ADDON"
+          if [ "$SIZE" -lt 200000 ] || [ "$MODS" -eq 0 ] || [ "$ADDON" -eq 0 ]; then
+            echo "::error::$J looks incomplete"; FAIL=1
           fi
         done
-        if [ "$FAIL" -ne 0 ]; then
-          echo "==== top-level data/ layout inside jar ===="
-          for J in build/libs/*.jar; do
-            [ -e "$J" ] || continue
-            echo "--- $J ---"
-            unzip -l "$J" | grep -E '^\s+[0-9]+.*data/' | awk '{print $4}' | sed -E 's#(data/[^/]+/[^/]+).*#\1#' | sort -u | head -20
-          done
-          exit 1
-        fi
-        echo "jar recipe assertion passed"
+        [ "$FAIL" -eq 0 ] && echo "jar sanity check passed" || exit 1
 
     - name: Upload mod JAR
       uses: actions/upload-artifact@v4
